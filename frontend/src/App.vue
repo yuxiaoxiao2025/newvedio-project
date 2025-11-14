@@ -138,8 +138,8 @@ export default {
             status: 'queued'
           }))
 
-          // 等待一小段时间确保WebSocket连接建立
-          await new Promise(resolve => setTimeout(resolve, 500))
+          // 等待足够时间确保WebSocket连接建立
+          await new Promise(resolve => setTimeout(resolve, 1000))
 
           // 开始上传
           const formData = new FormData()
@@ -163,10 +163,14 @@ export default {
 
             // 检查是否所有文件都上传成功
             if (uploadData.summary?.failedFiles === 0) {
-              // 等待更长时间让用户看到进度条
+              // 不要立即跳转，让用户看到进度条完成
+              // 进度条组件会在WebSocket收到完成信号后自动触发跳转
+              console.log('所有文件上传成功，等待进度条确认完成')
+            } else {
+              // 如果有失败文件，稍后跳转到完成页面显示结果
               setTimeout(() => {
                 currentStep.value = 'completed'
-              }, 2000)
+              }, 1000)
             }
           } else {
             throw new Error(uploadData.message || '上传失败')

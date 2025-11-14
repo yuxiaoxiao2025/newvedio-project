@@ -135,7 +135,7 @@ class UploadService {
     // Emit initial progress
     this.emitProgress(sessionId, {
       overallStatus: 'uploading',
-      totalProgress: 0,
+      totalProgress: 5, // 设置初始进度为5%，让用户看到上传开始了
       completedFiles: 0,
       failedFiles: 0,
       message: '开始上传文件...'

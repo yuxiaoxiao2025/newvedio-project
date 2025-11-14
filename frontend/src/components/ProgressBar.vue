@@ -111,7 +111,65 @@ export default {
   emits: ['upload-complete', 'upload-cancel'],
   setup(props, { emit }) {
     // Use WebSocket for real-time progress
-    const { progress, onCompleted, onError } = useWebSocket(props.sessionId)
+    const { progress, onCompleted, onError, connected } = useWebSocket(props.sessionId)
+
+    // HTTP轮询作为备用方案
+    let pollInterval = null
+    const startHttpPolling = () => {
+      if (pollInterval) return
+
+      pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/upload/progress/${props.sessionId}`)
+          if (response.ok) {
+            const data = await response.json()
+
+            // 只有在WebSocket未连接时才使用HTTP数据
+            if (!connected.value) {
+              progress.value.totalProgress = data.totalProgress
+              progress.value.completedFiles = data.completedFiles
+              progress.value.failedFiles = data.failedFiles
+              progress.value.overallStatus = data.overallStatus
+              progress.value.message = `已上传 ${data.completedFiles}/${data.totalFiles} 个文件`
+
+              // 更新文件状态
+              if (data.files && data.files.length > 0) {
+                data.files.forEach((uploadedFile, index) => {
+                  const existingFileIndex = files.value.findIndex(f =>
+                    f.originalName === uploadedFile.originalName
+                  )
+                  if (existingFileIndex >= 0) {
+                    files.value[existingFileIndex] = {
+                      ...files.value[existingFileIndex],
+                      progress: uploadedFile.progress || 100,
+                      status: uploadedFile.status || 'completed'
+                    }
+                  }
+                })
+              }
+            }
+
+            // 如果上传完成，停止轮询
+            if (data.overallStatus === 'completed' || data.overallStatus === 'partial') {
+              stopHttpPolling()
+              if (!connected.value) {
+                progress.value.totalProgress = 100
+                emit('upload-complete')
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('HTTP polling failed:', error)
+        }
+      }, 1000) // 每秒轮询一次
+    }
+
+    const stopHttpPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
 
     // Local files state with real-time updates
     const files = ref([])
@@ -151,17 +209,25 @@ export default {
 
     // Watch for overall progress updates
     watch(() => progress.value.totalProgress, (newProgress) => {
-      // Simulate progress for files if not provided by WebSocket
-      if (files.value.length > 0 && newProgress > 0) {
+      // 始终显示进度，即使没有WebSocket更新
+      if (files.value.length > 0) {
         const progressPerFile = newProgress / files.value.length
         files.value.forEach((file, index) => {
-          if (file.status === 'queued' || file.status === 'pending') {
-            const fileProgress = Math.min(progressPerFile * (index + 1), 100)
-            files.value[index] = {
-              ...file,
-              progress: Math.round(fileProgress),
-              status: fileProgress > 0 && fileProgress < 100 ? 'uploading' : fileProgress >= 100 ? 'completed' : file.status
-            }
+          // 更新文件状态和进度
+          const fileProgress = Math.min(progressPerFile * (index + 1), 100)
+          let fileStatus = file.status
+
+          // 根据进度更新状态
+          if (fileProgress > 0 && fileProgress < 100 && (fileStatus === 'queued' || fileStatus === 'pending')) {
+            fileStatus = 'uploading'
+          } else if (fileProgress >= 100 && fileStatus !== 'completed' && fileStatus !== 'failed') {
+            fileStatus = 'completed'
+          }
+
+          files.value[index] = {
+            ...file,
+            progress: Math.round(fileProgress),
+            status: fileStatus
           }
         })
       }
@@ -171,8 +237,30 @@ export default {
     files.value = props.files.map(file => ({
       ...file,
       progress: file.progress || 0,
-      status: file.status || 'pending'
+      status: file.status || 'pending',
+      id: file.id || Math.random().toString(36).substr(2, 9) // 确保有唯一ID
     }))
+
+    // 立即开始显示初始进度，确保用户能看到进度条
+    if (files.value.length > 0 && progress.value.totalProgress === 0) {
+      // 设置初始进度为5%，让用户看到上传开始了
+      setTimeout(() => {
+        progress.value.totalProgress = 5
+        progress.value.message = '正在准备上传文件...'
+      }, 100)
+    }
+
+    // 启动HTTP轮询作为备用方案
+    setTimeout(() => {
+      if (!connected.value) {
+        startHttpPolling()
+      }
+    }, 2000) // 2秒后如果WebSocket还没连接，启动HTTP轮询
+
+    // 组件卸载时清理
+    onUnmounted(() => {
+      stopHttpPolling()
+    })
 
     // 计算属性
     const overallProgress = computed(() => {

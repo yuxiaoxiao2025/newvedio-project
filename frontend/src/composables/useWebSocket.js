@@ -20,11 +20,20 @@ export function useWebSocket(sessionId) {
 
   // Connect to WebSocket
   const connect = () => {
-    if (!sessionId) return
+    if (!sessionId) {
+      console.warn('WebSocket: No sessionId provided')
+      return
+    }
+
+    console.log('WebSocket: Connecting to session', sessionId)
 
     socket.value = io('http://localhost:8005', {
       transports: ['websocket', 'polling'],
-      forceNew: true
+      forceNew: true,
+      timeout: 5000,
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000
     })
 
     socket.value.on('connect', () => {
@@ -71,10 +80,28 @@ export function useWebSocket(sessionId) {
 
     socket.value.on('error', (error) => {
       console.error('WebSocket error:', error)
+      connected.value = false
       if (onError.value) {
         onError.value(error)
       }
     })
+
+    socket.value.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error)
+      connected.value = false
+      // 如果连接失败，设置一个默认的进度状态
+      progress.value.message = 'WebSocket连接失败，使用HTTP轮询模式'
+      progress.value.totalProgress = 10 // 设置一个初始进度
+    })
+
+    // 设置连接超时
+    setTimeout(() => {
+      if (!connected.value && progress.value.totalProgress === 0) {
+        console.warn('WebSocket connection timeout, falling back to HTTP polling')
+        progress.value.message = '连接超时，切换到HTTP轮询模式'
+        progress.value.totalProgress = 10 // 设置一个初始进度
+      }
+    }, 3000)
   }
 
   // Disconnect from WebSocket

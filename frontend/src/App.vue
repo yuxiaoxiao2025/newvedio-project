@@ -128,6 +128,19 @@ export default {
         if (response.ok) {
           sessionId.value = data.sessionId
 
+          // 初始化上传文件数据
+          uploadFiles.value = selectedFiles.value.map((file, index) => ({
+            id: index,
+            originalName: file.name,
+            fileSize: file.size,
+            fileType: file.name.toLowerCase().split('.').pop(),
+            progress: 0,
+            status: 'queued'
+          }))
+
+          // 等待一小段时间确保WebSocket连接建立
+          await new Promise(resolve => setTimeout(resolve, 500))
+
           // 开始上传
           const formData = new FormData()
           selectedFiles.value.forEach(file => {
@@ -144,14 +157,16 @@ export default {
           const uploadData = await uploadResponse.json()
 
           if (uploadResponse.ok) {
-            uploadFiles.value = uploadData.files
-            completedFiles.value = uploadData.summary.completedFiles
+            // 更新文件状态
+            uploadFiles.value = uploadData.files || uploadFiles.value
+            completedFiles.value = uploadData.summary?.completedFiles || selectedFiles.value.length
 
             // 检查是否所有文件都上传成功
-            if (uploadData.summary.failedFiles === 0) {
+            if (uploadData.summary?.failedFiles === 0) {
+              // 等待更长时间让用户看到进度条
               setTimeout(() => {
                 currentStep.value = 'completed'
-              }, 1000)
+              }, 2000)
             }
           } else {
             throw new Error(uploadData.message || '上传失败')

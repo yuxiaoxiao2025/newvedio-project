@@ -23,7 +23,8 @@ export function useWebSocket(sessionId) {
     if (!sessionId) return
 
     socket.value = io('http://localhost:8005', {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      forceNew: true
     })
 
     socket.value.on('connect', () => {
@@ -40,7 +41,7 @@ export function useWebSocket(sessionId) {
     })
 
     socket.value.on('upload-progress', (data) => {
-      console.log('Progress update:', data)
+      console.log('WebSocket progress update received:', data)
 
       progress.value = {
         ...progress.value,
@@ -50,6 +51,7 @@ export function useWebSocket(sessionId) {
       // Update files array with current file progress
       if (data.currentFile) {
         progress.value.currentFile = data.currentFile
+        console.log('Current file progress updated:', data.currentFile)
       }
 
       // Emit progress event
@@ -59,6 +61,7 @@ export function useWebSocket(sessionId) {
 
       // Check if upload is completed
       if (data.overallStatus === 'completed') {
+        console.log('Upload completed via WebSocket')
         if (onCompleted.value) {
           onCompleted.value(data)
         }

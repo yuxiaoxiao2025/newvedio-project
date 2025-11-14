@@ -17,7 +17,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3005',
+    origin: [
+      'http://localhost:3005',
+      'http://localhost:3006',
+      'http://localhost:5173'
+    ],
     methods: ['GET', 'POST']
   }
 });
@@ -31,7 +35,11 @@ fs.ensureDirSync(path.join(__dirname, '../upload/scenic'));
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3005',
+  origin: [
+    'http://localhost:3005',
+    'http://localhost:3006',
+    'http://localhost:5173'
+  ],
   credentials: true
 }));
 

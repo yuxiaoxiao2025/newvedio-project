@@ -93,7 +93,7 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 
 export default {
@@ -119,6 +119,17 @@ export default {
     // Watch for WebSocket progress updates
     onCompleted.value = (data) => {
       console.log('Upload completed:', data)
+      progress.value.totalProgress = 100
+
+      // Update all files to completed status
+      files.value.forEach((file, index) => {
+        files.value[index] = {
+          ...file,
+          progress: 100,
+          status: 'completed'
+        }
+      })
+
       emit('upload-complete')
     }
 
@@ -138,11 +149,29 @@ export default {
       }
     })
 
+    // Watch for overall progress updates
+    watch(() => progress.value.totalProgress, (newProgress) => {
+      // Simulate progress for files if not provided by WebSocket
+      if (files.value.length > 0 && newProgress > 0) {
+        const progressPerFile = newProgress / files.value.length
+        files.value.forEach((file, index) => {
+          if (file.status === 'queued' || file.status === 'pending') {
+            const fileProgress = Math.min(progressPerFile * (index + 1), 100)
+            files.value[index] = {
+              ...file,
+              progress: Math.round(fileProgress),
+              status: fileProgress > 0 && fileProgress < 100 ? 'uploading' : fileProgress >= 100 ? 'completed' : file.status
+            }
+          }
+        })
+      }
+    })
+
     // Initialize with props.files
     files.value = props.files.map(file => ({
       ...file,
-      progress: 0,
-      status: 'pending'
+      progress: file.progress || 0,
+      status: file.status || 'pending'
     }))
 
     // 计算属性
@@ -206,6 +235,7 @@ export default {
       return statusMap[status] || status
     }
 
+  
     return {
       files,
       overallProgress,

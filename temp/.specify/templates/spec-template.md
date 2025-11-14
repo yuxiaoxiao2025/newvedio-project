@@ -80,6 +80,12 @@
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right functional requirements.
+
+  CONSTITUTION COMPLIANCE NOTE:
+  - All UI requirements must follow 移动优先适配原则 (320px-428px, 44px×44px touch areas)
+  - All design requirements must follow 简洁UI设计原则 (blue #1E88E5, green #4CAF50, red #F44336)
+  - All technical requirements must follow 原生技术开发原则 (HTML/CSS/JS only, no frameworks)
+  - All file upload requirements must follow 路径规范执行原则
 -->
 
 ### Functional Requirements

@@ -31,7 +31,28 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+### 移动优先适配原则检查
+- [ ] 界面设计是否符合320px-428px屏幕适配要求
+- [ ] 所有按钮和交互元素是否满足44px×44px最小触摸区域
+- [ ] 布局是否支持横竖屏切换
+- [ ] 字体大小在小屏幕上是否可读
+
+### 简洁UI设计原则检查
+- [ ] 主色调是否使用蓝色(#1E88E5)
+- [ ] 成功状态是否使用绿色(#4CAF50)
+- [ ] 错误状态是否使用红色(#F44336)
+- [ ] 界面设计是否简洁，避免不必要的装饰元素
+
+### 原生技术开发原则检查
+- [ ] 技术栈是否使用原生HTML/CSS/JavaScript
+- [ ] 是否避免引入第三方UI框架
+- [ ] 文件体积是否控制在合理范围内
+- [ ] 加载性能是否优化
+
+### 路径规范执行原则检查
+- [ ] 个人视频上传路径是否为/upload/personal/
+- [ ] 景区视频上传路径是否为/upload/scenic/
+- [ ] 路径映射是否严格且无偏差
 
 ## Project Structure
 

@@ -12,6 +12,12 @@ description: "Task list template for feature implementation"
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**CONSTITUTION COMPLIANCE**: All tasks must adhere to project constitution principles:
+- 移动优先适配原则: UI must support 320px-428px screens with 44px×44px minimum touch areas
+- 简洁UI设计原则: Use specified colors (#1E88E5, #4CAF50, #F44336) with clean design
+- 原生技术开发原则: Implement using HTML/CSS/JavaScript without third-party frameworks
+- 路径规范执行原则: Follow strict upload path mappings for file categories
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)

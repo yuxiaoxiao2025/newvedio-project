@@ -1,0 +1,38 @@
+{
+  "name": "video-upload-backend",
+  "version": "1.0.0",
+  "description": "Backend API for video file upload H5 application",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "video",
+    "upload",
+    "express",
+    "nodejs"
+  ],
+  "author": "Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.10.0",
+    "fs-extra": "^11.1.1",
+    "helmet": "^7.0.0",
+    "joi": "^17.9.2",
+    "multer": "^1.4.4",
+    "socket.io": "^4.8.1",
+    "uuid": "^9.0.0",
+    "winston": "^3.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.6.2",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  }
+}

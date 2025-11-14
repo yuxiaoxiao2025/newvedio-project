@@ -116,7 +116,9 @@ export function useWebSocket(sessionId) {
 
   // Auto connect on mount
   onMounted(() => {
-    connect()
+    if (sessionId) {
+      connect()
+    }
   })
 
   // Auto disconnect on unmount

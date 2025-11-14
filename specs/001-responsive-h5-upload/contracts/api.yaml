@@ -289,7 +289,7 @@ components:
         filePath:
           type: string
           description: 文件存储路径
-          example: "/upload/personal/2025/11/user123/550e8400-e29b-41d4-a716-446655440001_20251114120000_我的视频.mp4"
+          example: "/backend/upload/personal/2025/11/user123/550e8400-e29b-41d4-a716-446655440001_20251114120000_我的视频.mp4"
         fileSize:
           type: integer
           description: 文件大小(bytes)
@@ -362,7 +362,7 @@ components:
         uploadPath:
           type: string
           description: 上传路径
-          example: "/upload/personal/"
+          example: "/backend/upload/personal/"
         maxFiles:
           type: integer
           description: 最大文件数

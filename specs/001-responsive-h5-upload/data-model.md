@@ -63,7 +63,7 @@ interface BatchUploadSession {
   category: 'personal' | 'scenic';    // 文件分类
 
   // 存储信息
-  uploadPath: string;            // 上传路径 (/upload/personal/ 或 /upload/scenic/)
+  uploadPath: string;            // 上传路径 (/backend/upload/personal/ 或 /backend/upload/scenic/)
 
   // 会话状态
   overallStatus: 'pending' | 'uploading' | 'completed' | 'failed' | 'cancelled';
@@ -343,7 +343,7 @@ interface SanitizationRules {
 
   // 路径验证
   pathValidation: {
-    allowedPaths: ['/upload/personal/', '/upload/scenic/'];
+    allowedPaths: ['/backend/upload/personal/', '/backend/upload/scenic/'];
     preventAbsolutePath: /^\//;
     preventBackReference: /\.\./;
   };

@@ -52,6 +52,17 @@
 - **文件管理**: 本地文件系统分类存储
 - **功能范围**: 1个核心上传页面 + 文件分类管理
 
+**Implementation Timeline (Final)**:
+- **Day 1 Morning**: API Interface Development (7 tasks)
+- **Day 1 Afternoon**: Frontend Development (10 tasks)
+- **Day 2 Morning**: Progress Tracking (4 tasks)
+- **Day 2 Afternoon**: Testing (8 tasks)
+- **Total**: 1-2 days with practical quality
+- **Development Flow**: API First → Parallel Development → E2E Testing
+- **Logging**: Essential user + development logs
+- **Tech Stack**: Mature and stable technologies
+- **Technical Requirements**: Fixed ports, cnpm dependencies, structured debugging
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
@@ -86,9 +97,9 @@
 ### 技术约束合规性检查
 
 **✅ 技术栈要求**
-- 计划使用现代H5技术栈
-- 支持响应式设计和移动端优化
-- 兼容主流移动浏览器
+- 计划采用现代H5技术栈架构
+- 实现响应式设计和移动端优先优化
+- 确保主流移动浏览器兼容性
 
 **✅ 性能标准**
 - 首次加载时间<3秒 (章程要求)

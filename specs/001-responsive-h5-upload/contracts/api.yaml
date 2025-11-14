@@ -1,0 +1,544 @@
+openapi: 3.0.3
+info:
+  title: 视频文件上传 API
+  description: |
+    响应式H5文件上传页面的API接口文档
+
+    ## 功能特性
+    - 支持最多3个同类型视频文件上传(mp4/avi)
+    - 文件大小限制最大300MB
+    - 文件分类存储(个人视频/景区视频)
+    - 实时上传进度跟踪
+    - 完整的错误处理机制
+    - 移动端友好的响应式设计
+
+  version: 1.0.0
+  contact:
+    name: 开发团队
+    email: dev@example.com
+
+servers:
+  - url: http://localhost:3000
+    description: 开发环境
+  - url: https://api.example.com
+    description: 生产环境
+
+paths:
+  /api/upload/validate:
+    post:
+      summary: 验证上传文件
+      description: 在实际上传之前验证文件的格式、大小和数量
+      tags:
+        - 文件验证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - size
+                      - type
+                    properties:
+                      name:
+                        type: string
+                        description: 文件名
+                        example: "sample_video.mp4"
+                      size:
+                        type: integer
+                        description: 文件大小(bytes)
+                        example: 104857600
+                      type:
+                        type: string
+                        description: 文件类型
+                        example: "video/mp4"
+      responses:
+        '200':
+          description: 验证成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '400':
+          description: 验证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/session:
+    post:
+      summary: 创建上传会话
+      description: 创建新的批量上传会话，返回会话ID
+      tags:
+        - 会话管理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - category
+              properties:
+                category:
+                  $ref: '#/components/schemas/FileCategory'
+                expectedFiles:
+                  type: integer
+                  minimum: 1
+                  maximum: 3
+                  description: 预期上传的文件数量
+                  example: 2
+      responses:
+        '201':
+          description: 会话创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/batch:
+    post:
+      summary: 批量文件上传
+      description: 上传多个文件到指定分类目录
+      tags:
+        - 文件上传
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+                - sessionId
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                    description: 上传的文件(最多3个)
+                sessionId:
+                  type: string
+                  description: 上传会话ID
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                category:
+                  $ref: '#/components/schemas/FileCategory'
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          description: 请求错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 文件过大
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/progress/{sessionId}:
+    get:
+      summary: 获取上传进度
+      description: 获取指定会话中所有文件的上传进度
+      tags:
+        - 进度查询
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: 上传会话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 进度查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResponse'
+        '404':
+          description: 会话不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/cancel/{sessionId}:
+    post:
+      summary: 取消上传
+      description: 取消指定会话中所有未完成的上传
+      tags:
+        - 上传控制
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: 上传会话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResponse'
+        '404':
+          description: 会话不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/file/{fileId}:
+    delete:
+      summary: 删除文件
+      description: 删除已上传的文件(管理员功能)
+      tags:
+        - 文件管理
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          description: 文件ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "文件删除成功"
+        '404':
+          description: 文件不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    FileCategory:
+      type: string
+      enum: [personal, scenic]
+      description: 文件分类
+      example: "personal"
+
+    FileStatus:
+      type: string
+      enum: [pending, uploading, completed, failed, cancelled, queued]
+      description: 文件上传状态
+
+    FileInfo:
+      type: object
+      required:
+        - id
+        - originalName
+        - fileSize
+        - fileType
+        - status
+        - progress
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 文件唯一标识符
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        originalName:
+          type: string
+          description: 原始文件名
+          example: "我的视频.mp4"
+        fileName:
+          type: string
+          description: 存储文件名
+          example: "550e8400-e29b-41d4-a716-446655440001_20251114120000_我的视频.mp4"
+        filePath:
+          type: string
+          description: 文件存储路径
+          example: "/upload/personal/2025/11/user123/550e8400-e29b-41d4-a716-446655440001_20251114120000_我的视频.mp4"
+        fileSize:
+          type: integer
+          description: 文件大小(bytes)
+          example: 104857600
+        fileType:
+          type: string
+          enum: [mp4, avi]
+          description: 文件类型
+          example: "mp4"
+        status:
+          $ref: '#/components/schemas/FileStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 上传进度百分比
+          example: 75
+        uploadSpeed:
+          type: number
+          description: 上传速度(bytes/s)
+          example: 1048576
+        errorMessage:
+          type: string
+          description: 错误信息
+          example: "网络连接中断"
+
+    ValidationResponse:
+      type: object
+      required:
+        - valid
+        - files
+      properties:
+        valid:
+          type: boolean
+          description: 验证是否通过
+        files:
+          type: array
+          items:
+            type: object
+            required:
+              - index
+              - valid
+            properties:
+              index:
+                type: integer
+                description: 文件索引(从0开始)
+              valid:
+                type: boolean
+                description: 该文件是否有效
+              errors:
+                type: array
+                items:
+                  type: string
+                description: 错误信息列表
+
+    SessionResponse:
+      type: object
+      required:
+        - sessionId
+        - category
+        - uploadPath
+        - createdAt
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: 会话ID
+        category:
+          $ref: '#/components/schemas/FileCategory'
+        uploadPath:
+          type: string
+          description: 上传路径
+          example: "/upload/personal/"
+        maxFiles:
+          type: integer
+          description: 最大文件数
+          example: 3
+        allowedTypes:
+          type: array
+          items:
+            type: string
+          description: 允许的文件类型
+          example: ["mp4", "avi"]
+        maxFileSize:
+          type: integer
+          description: 最大文件大小(bytes)
+          example: 314572800
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+
+    UploadResponse:
+      type: object
+      required:
+        - success
+        - sessionId
+        - files
+      properties:
+        success:
+          type: boolean
+          description: 上传是否成功
+        sessionId:
+          type: string
+          format: uuid
+          description: 会话ID
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileInfo'
+        summary:
+          type: object
+          properties:
+            totalFiles:
+              type: integer
+              description: 总文件数
+            completedFiles:
+              type: integer
+              description: 已完成文件数
+            failedFiles:
+              type: integer
+              description: 失败文件数
+            totalSize:
+              type: integer
+              description: 总文件大小(bytes)
+
+    ProgressResponse:
+      type: object
+      required:
+        - sessionId
+        - overallStatus
+        - totalProgress
+        - files
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: 会话ID
+        overallStatus:
+          $ref: '#/components/schemas/FileStatus'
+        totalProgress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 总体进度百分比
+        completedFiles:
+          type: integer
+          description: 已完成文件数
+        failedFiles:
+          type: integer
+          description: 失败文件数
+        estimatedTimeRemaining:
+          type: integer
+          description: 预估剩余时间(秒)
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileInfo'
+        lastUpdate:
+          type: string
+          format: date-time
+          description: 最后更新时间
+
+    CancelResponse:
+      type: object
+      required:
+        - success
+        - sessionId
+        - cancelledFiles
+      properties:
+        success:
+          type: boolean
+          description: 取消是否成功
+        sessionId:
+          type: string
+          format: uuid
+          description: 会话ID
+        cancelledFiles:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 被取消的文件ID列表
+        message:
+          type: string
+          description: 操作结果消息
+          example: "成功取消2个文件的上传"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: 错误代码
+          example: "FILE_TOO_LARGE"
+        message:
+          type: string
+          description: 错误信息
+          example: "文件大小超过300MB限制"
+        details:
+          type: object
+          description: 错误详细信息
+          properties:
+            field:
+              type: string
+              description: 出错的字段
+            value:
+              type: string
+              description: 错误的值
+            constraint:
+              type: string
+              description: 约束条件
+        solution:
+          type: string
+          description: 解决建议
+          example: "请选择小于300MB的视频文件"
+        timestamp:
+          type: string
+          format: date-time
+          description: 错误发生时间
+        requestId:
+          type: string
+          description: 请求ID，用于追踪
+          example: "req_123456789"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT认证(可选，当前版本暂不实现)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: 文件验证
+    description: 文件上传前的验证功能
+  - name: 会话管理
+    description: 上传会话的创建和管理
+  - name: 文件上传
+    description: 文件上传相关接口
+  - name: 进度查询
+    description: 上传进度查询功能
+  - name: 上传控制
+    description: 上传控制功能(取消等)
+  - name: 文件管理
+    description: 文件管理功能(删除等)

@@ -80,6 +80,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/ai', require('./routes/ai'));
 
 // Multer error handling middleware
 const { handleMulterError } = require('./middleware/upload');

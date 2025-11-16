@@ -80,3 +80,13 @@ test-videos/**/*
 # Temporary folders
 tmp/
 temp/
+
+# API Keys and sensitive files
+*api-key*
+*apikey*
+*api_key*
+qwen api-key.md
+**/*api-key*
+**/*apikey*
+**/*api_key*
+

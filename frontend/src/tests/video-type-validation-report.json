@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-11-19T07:12:22.245Z",
+  "success": false,
+  "error": "Cannot find module 'E:\\trae-pc\\newvedio-001\\frontend\\utils\\analysisDataStructures.js' imported from E:\\trae-pc\\newvedio-001\\frontend\\src\\tests\\video-type-validation.js",
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "successRate": "0%"
+  }
+}

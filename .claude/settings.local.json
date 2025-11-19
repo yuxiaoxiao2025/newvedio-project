@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Skill(chrome-devtools-mcp-skill)",
-      "mcp__mcp-deepwiki__deepwiki_fetch"
+      "mcp__mcp-deepwiki__deepwiki_fetch",
+      "Skill(vue_cn)",
+      "Skill(qwen)",
+      "Skill(vite)"
     ],
     "deny": [],
     "ask": []

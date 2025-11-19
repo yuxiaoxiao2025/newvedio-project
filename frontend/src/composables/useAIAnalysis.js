@@ -1,5 +1,11 @@
 import { ref, computed } from 'vue'
 import { useWebSocket } from './useWebSocket'
+import {
+  saveAnalysisResult,
+  getAnalysisResults,
+  exportAnalysisResults,
+  getStorageStats
+} from '../utils/analysisStorage'
 
 /**
  * AI分析功能Composable
@@ -22,6 +28,8 @@ export function useAIAnalysis() {
    * 视频内容分析
    */
   const analyzeVideoContent = async (videoData) => {
+    const analysisStartTime = Date.now()
+
     try {
       isAnalyzing.value = true
       analysisProgress.value = 0
@@ -61,6 +69,24 @@ export function useAIAnalysis() {
       const result = await response.json()
       analysisResult.value = result.data
 
+      // 自动保存分析结果
+      try {
+        const saveData = {
+          ...result.data,
+          inputs: {
+            videoPath: videoData.path,
+            category: videoData.category,
+            sessionId: videoData.sessionId || null
+          },
+          createdAt: new Date().toISOString(),
+          processingTime: Date.now() - analysisStartTime
+        }
+        await saveAnalysisResult(saveData, 'content')
+      } catch (saveError) {
+        console.warn('保存分析结果失败:', saveError)
+        // 不阻塞主流程
+      }
+
       leaveSession(analysisId)
 
       return result.data
@@ -76,6 +102,8 @@ export function useAIAnalysis() {
    * 视频融合分析
    */
   const analyzeVideoFusion = async (video1Data, video2Data) => {
+    const analysisStartTime = Date.now()
+
     try {
       isAnalyzing.value = true
       analysisProgress.value = 0
@@ -115,6 +143,25 @@ export function useAIAnalysis() {
       const result = await response.json()
       analysisResult.value = result.data
 
+      // 自动保存分析结果
+      try {
+        const saveData = {
+          ...result.data,
+          inputs: {
+            video1Path: video1Data.path,
+            video2Path: video2Data.path,
+            category: video1Data.category,
+            sessionId: video1Data.sessionId || video2Data.sessionId || null
+          },
+          createdAt: new Date().toISOString(),
+          processingTime: Date.now() - analysisStartTime
+        }
+        await saveAnalysisResult(saveData, 'fusion')
+      } catch (saveError) {
+        console.warn('保存融合分析结果失败:', saveError)
+        // 不阻塞主流程
+      }
+
       leaveSession(fusionId)
 
       return result.data
@@ -130,6 +177,8 @@ export function useAIAnalysis() {
    * 生成背景音乐提示词
    */
   const generateMusicPrompt = async (fusionPlan) => {
+    const analysisStartTime = Date.now()
+
     try {
       isAnalyzing.value = true
       analysisProgress.value = 0
@@ -164,6 +213,24 @@ export function useAIAnalysis() {
       }
 
       const result = await response.json()
+
+      // 自动保存分析结果
+      try {
+        const saveData = {
+          ...result.data,
+          fusionPlan: fusionPlan,
+          inputs: {
+            fusionPlan: fusionPlan,
+            sessionId: fusionPlan.sessionId || null
+          },
+          createdAt: new Date().toISOString(),
+          processingTime: Date.now() - analysisStartTime
+        }
+        await saveAnalysisResult(saveData, 'music')
+      } catch (saveError) {
+        console.warn('保存音乐提示词失败:', saveError)
+        // 不阻塞主流程
+      }
 
       leaveSession(musicId)
 
@@ -264,6 +331,67 @@ export function useAIAnalysis() {
   }
 
   /**
+   * 获取分析历史记录
+   */
+  const getAnalysisHistory = (type = null) => {
+    return getAnalysisResults(type)
+  }
+
+  /**
+   * 导出分析结果
+   */
+  const exportResults = async (ids = [], format = 'json') => {
+    try {
+      const exportData = exportAnalysisResults(ids, format)
+
+      // 创建下载链接
+      const blob = new Blob([exportData], {
+        type: format === 'json' ? 'application/json' :
+             format === 'csv' ? 'text/csv' : 'text/plain'
+      })
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ai_analysis_results_${new Date().toISOString().split('T')[0]}.${format}`
+
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      return true
+    } catch (error) {
+      console.error('导出失败:', error)
+      error.value = `导出失败: ${error.message}`
+      return false
+    }
+  }
+
+  /**
+   * 获取存储统计信息
+   */
+  const getStorageStatistics = () => {
+    return getStorageStats()
+  }
+
+  /**
+   * 清理存储
+   */
+  const clearStorage = () => {
+    try {
+      localStorage.removeItem('ai_analysis_results')
+      localStorage.removeItem('ai_analysis_history')
+      localStorage.removeItem('ai_user_preferences')
+      localStorage.removeItem('ai_cache_expiry')
+      return true
+    } catch (error) {
+      console.error('清理存储失败:', error)
+      return false
+    }
+  }
+
+  /**
    * 格式化分析结果为用户友好的显示
    */
   const formattedResult = computed(() => {
@@ -309,6 +437,12 @@ export function useAIAnalysis() {
     generateMusicPrompt,
     analyzeUploadedFiles,
     getAnalysisStatus,
-    resetAnalysis
+    resetAnalysis,
+
+    // 存储和历史功能
+    getAnalysisHistory,
+    exportResults,
+    getStorageStatistics,
+    clearStorage
   }
 }

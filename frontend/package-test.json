@@ -1,0 +1,30 @@
+{
+  "name": "ai-video-analysis-tests",
+  "version": "1.0.0",
+  "description": "AI视频分析功能测试环境",
+  "type": "module",
+  "scripts": {
+    "test": "vite --config vite.test.config.js --mode test",
+    "test:build": "vite build --config vite.test.config.js --mode test",
+    "test:preview": "vite preview --config vite.test.config.js --port 3007",
+    "test:serve": "vite --config vite.test.config.js --host --port 3006",
+    "test:e2e": "npm run test:serve & sleep 5 && echo '测试环境已启动，请访问 http://localhost:3006/tests/'",
+    "test:ci": "vite build --config vite.test.config.js && echo 'CI测试构建完成'"
+  },
+  "dependencies": {
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.4.0",
+    "vite": "^4.4.0"
+  },
+  "keywords": [
+    "ai",
+    "video-analysis",
+    "testing",
+    "vue",
+    "vite"
+  ],
+  "author": "AI Analysis Team",
+  "license": "MIT"
+}

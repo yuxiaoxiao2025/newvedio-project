@@ -42,8 +42,114 @@
             <p style="color: #666; margin-bottom: 24px;">
               成功上传 {{ completedFiles }} 个文件
             </p>
-            <button @click="handleUploadComplete" class="btn btn-success">
-              上传完成
+
+            <!-- AI分析选项 -->
+            <div v-if="uploadedFilesData.length > 0" class="analysis-options">
+              <h3 style="color: #333; margin-bottom: 16px; font-size: 18px;">
+                🤖 AI智能分析
+              </h3>
+              <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+                选择您想要的AI分析类型，获取专业的视频处理建议
+              </p>
+
+              <div class="analysis-buttons">
+                <button
+                  @click="startAIAnalysis('content')"
+                  :disabled="isAnalyzing"
+                  class="btn btn-primary analysis-btn"
+                  style="margin-right: 12px; margin-bottom: 8px;"
+                >
+                  <span class="btn-icon">📊</span>
+                  {{ isAnalyzing && analysisType === 'content' ? '分析中...' : '内容分析' }}
+                </button>
+
+                <button
+                  v-if="uploadedFilesData.length >= 2"
+                  @click="startAIAnalysis('fusion')"
+                  :disabled="isAnalyzing"
+                  class="btn btn-secondary analysis-btn"
+                  style="margin-right: 12px; margin-bottom: 8px;"
+                >
+                  <span class="btn-icon">🎬</span>
+                  {{ isAnalyzing && analysisType === 'fusion' ? '分析中...' : '融合建议' }}
+                </button>
+
+                <button
+                  @click="handleUploadComplete"
+                  :disabled="isAnalyzing"
+                  class="btn btn-success"
+                  style="margin-bottom: 8px;"
+                >
+                  跳过分析
+                </button>
+              </div>
+
+              <!-- AI分析进度指示器 -->
+              <AIAnalysisProgress
+                v-if="isAnalyzing"
+                :analysis-type="analysisType"
+                :progress="analysisProgress"
+                :status="analysisError ? 'failed' : 'processing'"
+                :processing-info="analysisError || ''"
+                :start-time="analysisStartTime"
+                @cancel="handleAnalysisCancel"
+              />
+            </div>
+
+            <!-- 如果没有文件数据或跳过分析 -->
+            <div v-else>
+              <button @click="handleUploadComplete" class="btn btn-success">
+                上传完成
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI分析结果展示 -->
+      <div v-if="currentStep === 'analysis'" class="fade-in">
+        <div class="card">
+          <div class="analysis-header">
+            <h2 style="color: #333; margin-bottom: 16px;">
+              {{ getAnalysisResultTitle() }}
+            </h2>
+            <button @click="handleBackToUpload" class="btn btn-outline">
+              ← 返回
+            </button>
+          </div>
+
+          <!-- 分析结果 -->
+          <div class="analysis-result">
+            <ContentAnalysisView
+              v-if="analysisResult && analysisResult.type === 'content'"
+              :analysis="analysisResult.contentAnalysis"
+            />
+
+            <FusionAnalysisView
+              v-else-if="analysisResult && analysisResult.type === 'fusion'"
+              :analysis="analysisResult.fusionAnalysis"
+            />
+
+            <MusicPromptView
+              v-if="analysisResult && analysisResult.musicPrompt"
+              :prompt="analysisResult.musicPrompt"
+            />
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="analysis-actions">
+            <button
+              v-if="uploadedFilesData.length >= 2 && analysisResult && analysisResult.type === 'fusion'"
+              @click="generateMusicFromFusion"
+              :disabled="isGeneratingMusic"
+              class="btn btn-primary"
+              style="margin-right: 12px;"
+            >
+              {{ isGeneratingMusic ? '生成中...' : '生成背景音乐提示词' }}
+            </button>
+
+            <button @click="handleAnalysisComplete" class="btn btn-success">
+              完成分析
             </button>
           </div>
         </div>
@@ -80,6 +186,11 @@ import FileUploader from './components/FileUploader.vue'
 import CategoryDialog from './components/CategoryDialog.vue'
 import ProgressBar from './components/ProgressBar.vue'
 import ErrorMessage from './components/ErrorMessage.vue'
+import ContentAnalysisView from './components/ContentAnalysisView.vue'
+import FusionAnalysisView from './components/FusionAnalysisView.vue'
+import MusicPromptView from './components/MusicPromptView.vue'
+import AIAnalysisProgress from './components/AIAnalysisProgress.vue'
+import { useAIAnalysis } from './composables/useAIAnalysis'
 
 export default {
   name: 'App',
@@ -87,17 +198,39 @@ export default {
     FileUploader,
     CategoryDialog,
     ProgressBar,
-    ErrorMessage
+    ErrorMessage,
+    ContentAnalysisView,
+    FusionAnalysisView,
+    MusicPromptView,
+    AIAnalysisProgress
   },
   setup() {
     // 应用状态
-    const currentStep = ref('selection') // selection, uploading, completed, finished
+    const currentStep = ref('selection') // selection, uploading, completed, analysis, finished
     const showCategoryDialog = ref(false)
     const selectedFiles = ref([])
     const sessionId = ref('')
     const uploadFiles = ref([])
     const completedFiles = ref(0)
     const currentError = ref(null)
+
+    // AI分析相关状态
+    const uploadedFilesData = ref([])
+    const analysisType = ref('')
+    const isGeneratingMusic = ref(false)
+    const analysisStartTime = ref(null)
+
+    // 使用AI分析composable
+    const {
+      isAnalyzing,
+      analysisProgress,
+      analysisResult,
+      formattedResult,
+      error: analysisError,
+      analyzeUploadedFiles,
+      generateMusicPrompt,
+      resetAnalysis
+    } = useAIAnalysis()
 
     // 处理文件选择
     const handleFilesSelected = (files) => {
@@ -166,10 +299,31 @@ export default {
               // 不要立即跳转，让用户看到进度条完成
               // 进度条组件会在WebSocket收到完成信号后自动触发跳转
               console.log('所有文件上传成功，等待进度条确认完成')
+
+              // 保存上传成功的文件数据，用于AI分析
+              uploadedFilesData.value = uploadData.files.map(file => ({
+                id: file.id,
+                name: file.originalName,
+                path: file.filePath || `/uploads/${category}/${file.filename}`,
+                size: file.fileSize,
+                category: category,
+                sessionId: sessionId.value
+              }))
             } else {
               // 如果有失败文件，稍后跳转到完成页面显示结果
               setTimeout(() => {
                 currentStep.value = 'completed'
+                // 保存成功上传的文件数据
+                uploadedFilesData.value = uploadData.files
+                  .filter(file => file.status === 'completed')
+                  .map(file => ({
+                    id: file.id,
+                    name: file.originalName,
+                    path: file.filePath || `/uploads/${category}/${file.filename}`,
+                    size: file.fileSize,
+                    category: category,
+                    sessionId: sessionId.value
+                  }))
               }, 1000)
             }
           } else {
@@ -213,6 +367,94 @@ export default {
       currentError.value = null
     }
 
+    // AI分析相关方法
+    const startAIAnalysis = async (type) => {
+      try {
+        analysisType.value = type
+        analysisStartTime.value = Date.now()
+        resetAnalysis()
+
+        if (type === 'content') {
+          // 内容分析 - 使用第一个文件
+          const filesForAnalysis = uploadedFilesData.value.slice(0, 1)
+          await analyzeUploadedFiles(filesForAnalysis, filesForAnalysis[0].category, 'content')
+        } else if (type === 'fusion') {
+          // 融合分析 - 使用前两个文件
+          const filesForFusion = uploadedFilesData.value.slice(0, 2)
+          await analyzeUploadedFiles(filesForFusion, filesForFusion[0].category, 'fusion')
+        }
+
+        // 分析完成后跳转到结果展示页面
+        currentStep.value = 'analysis'
+      } catch (error) {
+        currentError.value = {
+          code: 'AI_ANALYSIS_ERROR',
+          message: error.message || 'AI分析失败',
+          solution: '请检查网络连接后重试，或联系技术支持'
+        }
+      }
+    }
+
+    const generateMusicFromFusion = async () => {
+      try {
+        isGeneratingMusic.value = true
+
+        if (formattedResult.value?.fusionAnalysis?.plan) {
+          const musicPrompt = await generateMusicPrompt(formattedResult.value.fusionAnalysis.plan)
+
+          // 更新分析结果，添加音乐提示词
+          if (analysisResult.value) {
+            analysisResult.value.musicPrompt = musicPrompt
+          }
+        }
+      } catch (error) {
+        currentError.value = {
+          code: 'MUSIC_GENERATION_ERROR',
+          message: error.message || '背景音乐提示词生成失败',
+          solution: '请稍后重试或检查网络连接'
+        }
+      } finally {
+        isGeneratingMusic.value = false
+      }
+    }
+
+    const handleBackToUpload = () => {
+      currentStep.value = 'completed'
+    }
+
+    const handleAnalysisCancel = () => {
+      resetAnalysis()
+      analysisType.value = ''
+      analysisStartTime.value = null
+      currentStep.value = 'completed'
+    }
+
+    const handleAnalysisComplete = () => {
+      currentStep.value = 'finished'
+    }
+
+    const getAnalysisTypeText = () => {
+      switch (analysisType.value) {
+        case 'content':
+          return '视频内容分析'
+        case 'fusion':
+          return '视频融合分析'
+        default:
+          return 'AI分析'
+      }
+    }
+
+    const getAnalysisResultTitle = () => {
+      switch (analysisType.value) {
+        case 'content':
+          return '📊 视频内容分析报告'
+        case 'fusion':
+          return '🎬 视频融合建议方案'
+        default:
+          return '🤖 AI分析结果'
+      }
+    }
+
     // 重置应用状态
     const handleReset = () => {
       currentStep.value = 'selection'
@@ -222,6 +464,12 @@ export default {
       sessionId.value = ''
       completedFiles.value = 0
       currentError.value = null
+
+      // 重置AI分析相关状态
+      uploadedFilesData.value = []
+      analysisType.value = ''
+      isGeneratingMusic.value = false
+      resetAnalysis()
     }
 
     // 组件挂载时的初始化
@@ -230,6 +478,7 @@ export default {
     })
 
     return {
+      // 基础状态
       currentStep,
       showCategoryDialog,
       selectedFiles,
@@ -237,13 +486,34 @@ export default {
       uploadFiles,
       completedFiles,
       currentError,
+
+      // AI分析相关状态
+      uploadedFilesData,
+      analysisType,
+      isAnalyzing,
+      analysisProgress,
+      analysisResult: formattedResult,
+      analysisError,
+      isGeneratingMusic,
+      analysisStartTime,
+
+      // 基础方法
       handleFilesSelected,
       handleCategorySelected,
       handleCategoryCancel,
       handleUploadComplete,
       handleUploadCancel,
       handleErrorClose,
-      handleReset
+      handleReset,
+
+      // AI分析方法
+      startAIAnalysis,
+      generateMusicFromFusion,
+      handleBackToUpload,
+      handleAnalysisComplete,
+      handleAnalysisCancel,
+      getAnalysisTypeText,
+      getAnalysisResultTitle
     }
   }
 }
@@ -253,5 +523,160 @@ export default {
 #app {
   min-height: 100vh;
   background-color: #f5f5f5;
+}
+
+/* AI分析选项样式 */
+.analysis-options {
+  margin: 24px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.analysis-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.analysis-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-icon {
+  margin-right: 6px;
+  font-size: 16px;
+}
+
+/* 分析进度样式 */
+.analysis-progress {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #fff;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #52C41A 0%, #73D13D 100%);
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+
+/* 分析结果展示样式 */
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.analysis-result {
+  margin-bottom: 32px;
+}
+
+.analysis-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .analysis-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .analysis-btn {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .analysis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .analysis-actions {
+    flex-direction: column;
+  }
+}
+
+/* 按钮样式补充 */
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: #007bff;
+  border: 1px solid #007bff;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

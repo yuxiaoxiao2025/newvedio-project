@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI视频分析功能测试套件</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .test-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      text-align: center;
+      color: white;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .test-header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .test-header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    .error {
+      background: rgba(220, 53, 69, 0.1);
+      border: 1px solid rgba(220, 53, 69, 0.3);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px;
+      color: #fff;
+      text-align: center;
+    }
+
+    .test-info {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .test-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .stat-item {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 768px) {
+      .test-header h1 {
+        font-size: 2rem;
+      }
+
+      .test-container {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="test-header">
+      <h1>🤖 AI视频分析功能测试套件</h1>
+      <p>基于Vue 3 + Vite + Qwen的专业测试环境</p>
+    </div>
+
+    <div class="test-container">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading">
+        <div class="loading-spinner">⏳ 正在加载测试环境...</div>
+        <p>请稍候，正在初始化测试组件和服务</p>
+      </div>
+
+      <!-- 错误状态 -->
+      <div v-if="error" class="error">
+        <h3>❌ 加载失败</h3>
+        <p>{{ error }}</p>
+        <button @click="retry" style="margin-top: 15px; padding: 10px 20px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer;">
+          重试
+        </button>
+      </div>
+
+      <!-- 测试信息概览 -->
+      <div v-if="!loading && !error" class="test-info">
+        <h3>📊 测试环境概览</h3>
+        <div class="test-stats">
+          <div class="stat-item">
+            <div class="stat-value">{{ environmentInfo.nodeVersion }}</div>
+            <div class="stat-label">Node.js 版本</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ environmentInfo.viteVersion }}</div>
+            <div class="stat-label">Vite 版本</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ environmentInfo.vueVersion }}</div>
+            <div class="stat-label">Vue 版本</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ environmentInfo.testCount }}</div>
+            <div class="stat-label">测试用例数</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vue测试套件组件将在这里渲染 -->
+      <div id="test-suite" v-if="!loading && !error"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp } from 'vue'
+    import AITestSuite from './components/AITestSuite.vue'
+
+    const app = createApp({
+      components: {
+        AITestSuite
+      },
+      data() {
+        return {
+          loading: true,
+          error: null,
+          environmentInfo: {
+            nodeVersion: 'Unknown',
+            viteVersion: 'Unknown',
+            vueVersion: 'Unknown',
+            testCount: 0
+          }
+        }
+      },
+      async mounted() {
+        try {
+          // 获取环境信息
+          await this.loadEnvironmentInfo()
+
+          // 渲染测试套件组件
+          this.renderTestSuite()
+
+          this.loading = false
+        } catch (err) {
+          console.error('Test suite initialization error:', err)
+          this.error = `初始化失败: ${err.message}`
+          this.loading = false
+        }
+      },
+      methods: {
+        async loadEnvironmentInfo() {
+          try {
+            // 获取包版本信息
+            const packageJson = await fetch('/package.json').then(r => r.json()).catch(() => ({}))
+
+            this.environmentInfo = {
+              nodeVersion: typeof process !== 'undefined' ? process.versions?.node : 'Browser',
+              viteVersion: packageJson.devDependencies?.vite || 'Unknown',
+              vueVersion: packageJson.dependencies?.vue || 'Unknown',
+              testCount: 15 // 根据实际测试用例数量
+            }
+          } catch (err) {
+            console.warn('Failed to load environment info:', err)
+          }
+        },
+
+        renderTestSuite() {
+          const testSuiteContainer = document.getElementById('test-suite')
+          if (testSuiteContainer) {
+            const testSuiteApp = createApp(AITestSuite)
+            testSuiteApp.mount(testSuiteContainer)
+          }
+        },
+
+        retry() {
+          this.error = null
+          this.loading = true
+          this.mounted()
+        }
+      }
+    })
+
+    app.mount('#app')
+  </script>
+</body>
+</html>

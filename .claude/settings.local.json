@@ -7,7 +7,14 @@
       "Skill(qwen)",
       "Skill(vite)",
       "Skill(express4x)",
-      "Skill(artifacts-builder)"
+      "Skill(artifacts-builder)",
+      "Skill(webapp-testing)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_file_upload",
+      "mcp__playwright__browser_wait_for"
     ],
     "deny": [],
     "ask": []

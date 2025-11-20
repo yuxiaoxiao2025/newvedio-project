@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const AIController = require('../controllers/aiController');
-const { authenticate } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 const aiController = new AIController();
@@ -28,7 +28,7 @@ const upload = multer({
  * POST /api/ai/analyze/content
  * 视频内容分析
  */
-router.post('/analyze/content', authenticate, async (req, res) => {
+router.post('/analyze/content', requireAuth, async (req, res) => {
   await aiController.analyzeVideo(req, res);
 });
 
@@ -36,7 +36,7 @@ router.post('/analyze/content', authenticate, async (req, res) => {
  * POST /api/ai/analyze/fusion
  * 视频融合分析
  */
-router.post('/analyze/fusion', authenticate, async (req, res) => {
+router.post('/analyze/fusion', requireAuth, async (req, res) => {
   await aiController.analyzeFusion(req, res);
 });
 
@@ -44,7 +44,7 @@ router.post('/analyze/fusion', authenticate, async (req, res) => {
  * POST /api/ai/generate/music-prompt
  * 背景音乐提示词生成
  */
-router.post('/generate/music-prompt', authenticate, async (req, res) => {
+router.post('/generate/music-prompt', requireAuth, async (req, res) => {
   await aiController.generateMusicPrompt(req, res);
 });
 
@@ -53,7 +53,7 @@ router.post('/generate/music-prompt', authenticate, async (req, res) => {
  * 一体化上传分析
  */
 router.post('/analyze/upload',
-  authenticate,
+  requireAuth,
   upload.array('videos', 2), // 最多2个文件
   async (req, res) => {
     await aiController.analyzeUploadedFile(req, res);
@@ -64,7 +64,7 @@ router.post('/analyze/upload',
  * GET /api/ai/analysis/:analysisId/status
  * 分析状态查询
  */
-router.get('/analysis/:analysisId/status', authenticate, async (req, res) => {
+router.get('/analysis/:analysisId/status', requireAuth, async (req, res) => {
   await aiController.getAnalysisStatus(req, res);
 });
 

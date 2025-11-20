@@ -26,6 +26,8 @@ export function useAIAnalysis() {
 
   /**
    * 视频内容分析
+   * 问题9修复: 添加超时控制
+   * 问题12修复: 监听WebSocket真实进度
    */
   const analyzeVideoContent = async (videoData) => {
     const analysisStartTime = Date.now()
@@ -38,58 +40,91 @@ export function useAIAnalysis() {
 
       // 生成分析会话ID
       const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      joinSession(analysisId)
-
-      // 模拟进度更新
-      const progressInterval = setInterval(() => {
-        if (analysisProgress.value < 90) {
-          analysisProgress.value += 10
-        }
-      }, 1000)
-
-      const response = await fetch(`${API_BASE}/api/ai/analyze/content`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`
-        },
-        body: JSON.stringify({
-          videoPath: videoData.path,
-          category: videoData.category
-        })
-      })
-
-      clearInterval(progressInterval)
-      analysisProgress.value = 100
-
-      if (!response.ok) {
-        throw new Error(`分析失败: ${response.status} ${response.statusText}`)
+      
+      // 问题12修复: 加入WebSocket会话并监听真实进度
+      const socket = joinSession(analysisId)
+      
+      // 监听服务器推送的真实进度
+      const progressHandler = (data) => {
+        analysisProgress.value = data.progress
+        console.log(`分析进度: ${data.progress}% - ${data.message}`)
+      }
+      
+      const errorHandler = (data) => {
+        error.value = data.message
+      }
+      
+      if (socket) {
+        socket.on('analysis:progress', progressHandler)
+        socket.on('analysis:error', errorHandler)
       }
 
-      const result = await response.json()
-      analysisResult.value = result.data
+      // 问题9修复: 添加超时控制 (3分钟)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 180000) // 3分钟超时
 
-      // 自动保存分析结果
       try {
-        const saveData = {
-          ...result.data,
-          inputs: {
+        const response = await fetch(`${API_BASE}/api/ai/analyze/content`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`,
+            'X-Session-Id': analysisId
+          },
+          body: JSON.stringify({
             videoPath: videoData.path,
             category: videoData.category,
-            sessionId: videoData.sessionId || null
-          },
-          createdAt: new Date().toISOString(),
-          processingTime: Date.now() - analysisStartTime
+            sessionId: analysisId
+          }),
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+        analysisProgress.value = 100
+
+        if (!response.ok) {
+          throw new Error(`分析失败: ${response.status} ${response.statusText}`)
         }
-        await saveAnalysisResult(saveData, 'content')
-      } catch (saveError) {
-        console.warn('保存分析结果失败:', saveError)
-        // 不阻塞主流程
+
+        const result = await response.json()
+        analysisResult.value = result.data
+
+        // 自动保存分析结果
+        try {
+          const saveData = {
+            ...result.data,
+            inputs: {
+              videoPath: videoData.path,
+              category: videoData.category,
+              sessionId: videoData.sessionId || null
+            },
+            createdAt: new Date().toISOString(),
+            processingTime: Date.now() - analysisStartTime
+          }
+          await saveAnalysisResult(saveData, 'content')
+        } catch (saveError) {
+          console.warn('保存分析结果失败:', saveError)
+          // 不阻塞主流程
+        }
+
+        return result.data
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        
+        if (fetchError.name === 'AbortError') {
+          throw new Error('分析超时，请重试或联系管理员')
+        }
+        throw fetchError
+      } finally {
+        // 清理事件监听
+        if (socket) {
+          socket.off('analysis:progress', progressHandler)
+          socket.off('analysis:error', errorHandler)
+        }
+        leaveSession(analysisId)
       }
-
-      leaveSession(analysisId)
-
-      return result.data
     } catch (err) {
       error.value = err.message
       throw err
@@ -100,6 +135,8 @@ export function useAIAnalysis() {
 
   /**
    * 视频融合分析
+   * 问题9修复: 添加超时控制
+   * 问题12修复: 监听WebSocket真实进度
    */
   const analyzeVideoFusion = async (video1Data, video2Data) => {
     const analysisStartTime = Date.now()
@@ -111,60 +148,93 @@ export function useAIAnalysis() {
       analysisResult.value = null
 
       const fusionId = `fusion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      joinSession(fusionId)
-
-      // 融合分析需要更长时间，进度更新更慢
-      const progressInterval = setInterval(() => {
-        if (analysisProgress.value < 85) {
-          analysisProgress.value += 5
-        }
-      }, 1500)
-
-      const response = await fetch(`${API_BASE}/api/ai/analyze/fusion`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`
-        },
-        body: JSON.stringify({
-          video1Path: video1Data.path,
-          video2Path: video2Data.path,
-          category: video1Data.category // 假设同一类别
-        })
-      })
-
-      clearInterval(progressInterval)
-      analysisProgress.value = 100
-
-      if (!response.ok) {
-        throw new Error(`融合分析失败: ${response.status} ${response.statusText}`)
+      
+      // 问题12修复: 加入WebSocket会话并监听真实进度
+      const socket = joinSession(fusionId)
+      
+      // 监听服务器推送的真实进度
+      const progressHandler = (data) => {
+        analysisProgress.value = data.progress
+        console.log(`融合分析进度: ${data.progress}% - ${data.message}`)
+      }
+      
+      const errorHandler = (data) => {
+        error.value = data.message
+      }
+      
+      if (socket) {
+        socket.on('analysis:progress', progressHandler)
+        socket.on('analysis:error', errorHandler)
       }
 
-      const result = await response.json()
-      analysisResult.value = result.data
+      // 问题9修复: 添加超时控制 (5分钟，融合分析需要更长时间)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 300000) // 5分钟超时
 
-      // 自动保存分析结果
       try {
-        const saveData = {
-          ...result.data,
-          inputs: {
+        const response = await fetch(`${API_BASE}/api/ai/analyze/fusion`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`,
+            'X-Session-Id': fusionId
+          },
+          body: JSON.stringify({
             video1Path: video1Data.path,
             video2Path: video2Data.path,
-            category: video1Data.category,
-            sessionId: video1Data.sessionId || video2Data.sessionId || null
-          },
-          createdAt: new Date().toISOString(),
-          processingTime: Date.now() - analysisStartTime
+            category: video1Data.category, // 假设同一类别
+            sessionId: fusionId
+          }),
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+        analysisProgress.value = 100
+
+        if (!response.ok) {
+          throw new Error(`融合分析失败: ${response.status} ${response.statusText}`)
         }
-        await saveAnalysisResult(saveData, 'fusion')
-      } catch (saveError) {
-        console.warn('保存融合分析结果失败:', saveError)
-        // 不阻塞主流程
+
+        const result = await response.json()
+        analysisResult.value = result.data
+
+        // 自动保存分析结果
+        try {
+          const saveData = {
+            ...result.data,
+            inputs: {
+              video1Path: video1Data.path,
+              video2Path: video2Data.path,
+              category: video1Data.category,
+              sessionId: video1Data.sessionId || video2Data.sessionId || null
+            },
+            createdAt: new Date().toISOString(),
+            processingTime: Date.now() - analysisStartTime
+          }
+          await saveAnalysisResult(saveData, 'fusion')
+        } catch (saveError) {
+          console.warn('保存融合分析结果失败:', saveError)
+          // 不阻塞主流程
+        }
+
+        return result.data
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        
+        if (fetchError.name === 'AbortError') {
+          throw new Error('融合分析超时，请重试或联系管理员')
+        }
+        throw fetchError
+      } finally {
+        // 清理事件监听
+        if (socket) {
+          socket.off('analysis:progress', progressHandler)
+          socket.off('analysis:error', errorHandler)
+        }
+        leaveSession(fusionId)
       }
-
-      leaveSession(fusionId)
-
-      return result.data
     } catch (err) {
       error.value = err.message
       throw err

@@ -43,7 +43,9 @@ class AIController {
       }
 
       // 执行三阶段分析
-      const analysisResult = await this.aiService.analyzeVideoThreeStage(resolvedPath);
+      const io = req.app.get('io'); // 获取Socket.IO实例
+      const sessionId = req.body.sessionId || req.headers['x-session-id']; // 从请求中获取sessionId
+      const analysisResult = await this.aiService.analyzeVideoThreeStage(resolvedPath, io, sessionId);
 
       res.json({
         success: true,
@@ -103,7 +105,9 @@ class AIController {
       }
 
       // 执行融合分析
-      const fusionResult = await this.aiService.analyzeFusionThreeStage(resolvedPath1, resolvedPath2);
+      const io = req.app.get('io'); // 获取Socket.IO实例
+      const sessionId = req.body.sessionId || req.headers['x-session-id']; // 从请求中获取sessionId
+      const fusionResult = await this.aiService.analyzeFusionThreeStage(resolvedPath1, resolvedPath2, io, sessionId);
 
       res.json({
         success: true,

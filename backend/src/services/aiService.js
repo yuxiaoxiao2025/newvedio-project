@@ -108,8 +108,9 @@ class AIService {
             role: 'user',
             content: [
               {
-                type: 'video_url',
-                video_url: {
+                // 问题11修复: 根据阿里云官方文档，视频URL应使用image_url类型
+                type: 'image_url',
+                image_url: {
                   url: videoPath
                 }
               },
@@ -125,7 +126,17 @@ class AIService {
         temperature: 0.3
       });
 
-      return JSON.parse(completion.choices[0].message.content);
+      // 问题10修复: 增强JSON解析的健壮性
+      try {
+        const result = JSON.parse(completion.choices[0].message.content);
+        return result;
+      } catch (parseError) {
+        console.error('AI返回内容JSON解析失败:', {
+          content: completion.choices[0].message.content,
+          error: parseError.message
+        });
+        throw new Error('AI分析结果格式异常,请重试');
+      }
     } catch (error) {
       console.error('VL模型分析失败:', error);
       throw new Error(`视频分析失败: ${error.message}`);
@@ -424,21 +435,76 @@ class AIService {
 
   /**
    * 三阶段处理流程：视频内容分析
+   * 问题12修复: 增加WebSocket实时进度推送
    */
-  async analyzeVideoThreeStage(videoPath) {
+  async analyzeVideoThreeStage(videoPath, io = null, sessionId = null) {
     try {
       // 阶段1: VL模型视频理解
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 1,
+          progress: 10,
+          message: '开始视频理解分析...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const vlAnalysis = await this.callWithRetry(() =>
         this.analyzeVideoContent(videoPath)
       );
 
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 1,
+          progress: 40,
+          message: '视频理解完成',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // 阶段2: 数据转换和结构化
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 2,
+          progress: 50,
+          message: '数据结构化处理中...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const structuredData = this.structureVideoData(vlAnalysis);
 
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 2,
+          progress: 60,
+          message: '数据结构化完成',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // 阶段3: qwen-plus生成专业报告
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 3,
+          progress: 70,
+          message: '生成分析报告...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const finalReport = await this.callWithRetry(() =>
         this.generateVideoReport(structuredData, 'content')
       );
+
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 3,
+          progress: 100,
+          message: '分析完成',
+          timestamp: new Date().toISOString()
+        });
+      }
 
       return {
         rawAnalysis: vlAnalysis,
@@ -447,28 +513,91 @@ class AIService {
       };
     } catch (error) {
       console.error('三阶段视频分析失败:', error);
+      
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:error', {
+          message: '分析失败: ' + error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       throw error;
     }
   }
 
   /**
    * 三阶段处理流程：视频融合分析
+   * 问题12修复: 增加WebSocket实时进度推送
    */
-  async analyzeFusionThreeStage(video1Path, video2Path) {
+  async analyzeFusionThreeStage(video1Path, video2Path, io = null, sessionId = null) {
     try {
       // 阶段1: 双视频VL分析
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 1,
+          progress: 10,
+          message: '开始分析两个视频...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const [video1Analysis, video2Analysis] = await Promise.all([
         this.callWithRetry(() => this.analyzeVideoContent(video1Path)),
         this.callWithRetry(() => this.analyzeVideoContent(video2Path))
       ]);
 
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 1,
+          progress: 40,
+          message: '视频理解完成',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // 阶段2: 数据整合和结构化
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 2,
+          progress: 50,
+          message: '融合数据处理中...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const fusionData = this.structureFusionData(video1Analysis, video2Analysis);
 
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 2,
+          progress: 60,
+          message: '数据融合完成',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // 阶段3: qwen-plus生成融合方案
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 3,
+          progress: 70,
+          message: '生成融合方案...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const fusionPlan = await this.callWithRetry(() =>
         this.generateVideoReport(fusionData, 'fusion')
       );
+
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:progress', {
+          stage: 3,
+          progress: 100,
+          message: '融合分析完成',
+          timestamp: new Date().toISOString()
+        });
+      }
 
       return {
         video1Analysis,
@@ -478,6 +607,14 @@ class AIService {
       };
     } catch (error) {
       console.error('三阶段融合分析失败:', error);
+      
+      if (io && sessionId) {
+        io.to(`session:${sessionId}`).emit('analysis:error', {
+          message: '融合分析失败: ' + error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       throw error;
     }
   }
@@ -660,17 +797,34 @@ class AIService {
           throw enhancedError;
         }
 
+        // 问题8修复: 优化速率限制处理
+        let delay;
+        if (error.status === 429) {
+          // 处理429速率限制错误
+          const retryAfter = error.headers?.['retry-after'] || error.headers?.['Retry-After'];
+          if (retryAfter) {
+            // 如果有Retry-After头，使用其指定的时间
+            delay = parseInt(retryAfter) * 1000;
+            console.warn(`触发AI服务速率限制，将在${retryAfter}秒后重试`);
+          } else {
+            // 没有Retry-After头，使用更长的退避时间
+            delay = Math.pow(2, attempt + 2) * 1000; // 4秒、8秒、16秒
+            console.warn(`触发AI服务速率限制，将在${delay / 1000}秒后重试`);
+          }
+        } else {
+          // 其他错误使用标准指数退避
+          delay = process.env.NODE_ENV === 'test' ? 1 : Math.pow(2, attempt) * 1000;
+        }
+
         // 记录重试信息
         console.warn(`AI服务调用失败，重试 ${attempt + 1}/${maxRetries}:`, {
           message: error.message,
           code: error.code,
           status: error.status,
-          retryAttempt: attempt + 1
+          retryAttempt: attempt + 1,
+          delaySeconds: delay / 1000
         });
 
-        // 基于Qwen官方推荐的指数退避策略：wait_time = 2 ^ attempt
-        // 第一次重试等待2^0 = 1秒，第二次重试等待2^1 = 2秒，第三次重试等待2^2 = 4秒
-        const delay = process.env.NODE_ENV === 'test' ? 1 : Math.pow(2, attempt) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

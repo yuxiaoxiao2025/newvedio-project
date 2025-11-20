@@ -13,12 +13,21 @@ class AIController {
    */
   async analyzeVideo(req, res) {
     try {
-      const { videoPath } = req.body;
+      const { videoPath, category } = req.body;
 
       if (!videoPath) {
         return res.status(400).json({
           success: false,
           error: '缺少视频文件路径'
+        });
+      }
+
+      // 问题VALID-002修复: 验证category参数
+      const VALID_CATEGORIES = ['personal', 'scenic'];
+      if (category && !VALID_CATEGORIES.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          error: `无效的分类参数，仅支持: ${VALID_CATEGORIES.join(', ')}`
         });
       }
 
@@ -58,10 +67,17 @@ class AIController {
       });
 
     } catch (error) {
-      console.error('视频分析API错误:', error);
+      // 问题ROBUST-003修复: 不直接暴露内部错误消息
+      const logger = require('../utils/logger');
+      logger.error('视频分析API错误:', {
+        error: error.message,
+        stack: error.stack,
+        videoPath: req.body.videoPath
+      });
+      
       res.status(500).json({
         success: false,
-        error: error.message
+        error: '视频分析服务暂时不可用,请稍后重试'
       });
     }
   }
@@ -71,12 +87,21 @@ class AIController {
    */
   async analyzeFusion(req, res) {
     try {
-      const { video1Path, video2Path } = req.body;
+      const { video1Path, video2Path, category } = req.body;
 
       if (!video1Path || !video2Path) {
         return res.status(400).json({
           success: false,
           error: '缺少两个视频文件路径'
+        });
+      }
+
+      // 问题VALID-002修复: 验证category参数
+      const VALID_CATEGORIES = ['personal', 'scenic'];
+      if (category && !VALID_CATEGORIES.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          error: `无效的分类参数，仅支持: ${VALID_CATEGORIES.join(', ')}`
         });
       }
 
@@ -121,10 +146,18 @@ class AIController {
       });
 
     } catch (error) {
-      console.error('视频融合分析API错误:', error);
+      // 问题ROBUST-003修复: 不直接暴露内部错误消息
+      const logger = require('../utils/logger');
+      logger.error('视频融合分析API错误:', {
+        error: error.message,
+        stack: error.stack,
+        video1Path: req.body.video1Path,
+        video2Path: req.body.video2Path
+      });
+      
       res.status(500).json({
         success: false,
-        error: error.message
+        error: '视频融合分析服务暂时不可用,请稍后重试'
       });
     }
   }
@@ -156,10 +189,16 @@ class AIController {
       });
 
     } catch (error) {
-      console.error('音乐提示词生成API错误:', error);
+      // 问题ROBUST-003修复: 不直接暴露内部错误消息
+      const logger = require('../utils/logger');
+      logger.error('音乐提示词生成API错误:', {
+        error: error.message,
+        stack: error.stack
+      });
+      
       res.status(500).json({
         success: false,
-        error: error.message
+        error: '音乐提示词生成服务暂时不可用,请稍后重试'
       });
     }
   }
@@ -171,6 +210,15 @@ class AIController {
     try {
       const { category, analysisType } = req.body;
       const uploadedFiles = req.files;
+
+      // 问题VALID-002修复: 验证category参数
+      const VALID_CATEGORIES = ['personal', 'scenic'];
+      if (category && !VALID_CATEGORIES.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          error: `无效的分类参数，仅支持: ${VALID_CATEGORIES.join(', ')}`
+        });
+      }
 
       if (!uploadedFiles || uploadedFiles.length === 0) {
         return res.status(400).json({
@@ -227,10 +275,18 @@ class AIController {
       });
 
     } catch (error) {
-      console.error('一体化分析API错误:', error);
+      // 问题ROBUST-003修复: 不直接暴露内部错误消息
+      const logger = require('../utils/logger');
+      logger.error('一体化分析API错误:', {
+        error: error.message,
+        stack: error.stack,
+        analysisType: req.body.analysisType,
+        fileCount: req.files?.length || 0
+      });
+      
       res.status(500).json({
         success: false,
-        error: error.message
+        error: 'AI分析服务暂时不可用,请稍后重试'
       });
     }
   }
@@ -255,10 +311,16 @@ class AIController {
       });
 
     } catch (error) {
-      console.error('状态查询API错误:', error);
+      // 问题ROBUST-003修复: 不直接暴露内部错误消息
+      const logger = require('../utils/logger');
+      logger.error('状态查询API错误:', {
+        error: error.message,
+        analysisId: req.params.analysisId
+      });
+      
       res.status(500).json({
         success: false,
-        error: error.message
+        error: '查询服务暂时不可用,请稍后重试'
       });
     }
   }

@@ -1,28 +1,11 @@
 const express = require('express');
-const multer = require('multer');
 const AIController = require('../controllers/aiController');
 const { requireAuth } = require('../middleware/auth');
+// 问题ROBUST-004修复: 复用统一的upload中间件配置
+const { array: uploadArray } = require('../middleware/upload');
 
 const router = express.Router();
 const aiController = new AIController();
-
-// 配置文件上传
-const upload = multer({
-  dest: 'uploads/temp/',
-  limits: {
-    fileSize: 300 * 1024 * 1024, // 300MB
-    files: 2 // 最多2个文件
-  },
-  fileFilter: (req, file, cb) => {
-    // 检查文件类型
-    const allowedTypes = ['video/mp4', 'video/avi', 'video/mpeg'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('不支持的文件类型。仅支持MP4、AVI格式。'), false);
-    }
-  }
-});
 
 /**
  * POST /api/ai/analyze/content
@@ -54,7 +37,7 @@ router.post('/generate/music-prompt', requireAuth, async (req, res) => {
  */
 router.post('/analyze/upload',
   requireAuth,
-  upload.array('videos', 2), // 最多2个文件
+  uploadArray, // 使用统一的upload中间件
   async (req, res) => {
     await aiController.analyzeUploadedFile(req, res);
   }

@@ -7,15 +7,23 @@ const OpenAI = require('openai');
  */
 class AIService {
   constructor() {
-    this.vlClient = new OpenAI({
-      apiKey: process.env.DASHSCOPE_API_KEY,
-      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    });
+    // 问题2修复: 验证API密钥是否存在
+    if (!process.env.DASHSCOPE_API_KEY) {
+      throw new Error(
+        'DASHSCOPE_API_KEY环境变量未设置。请在.env文件中配置: DASHSCOPE_API_KEY=your-api-key'
+      );
+    }
 
-    this.textClient = new OpenAI({
+    // 问题5修复: 添加超时配置，防止请求永久挂起
+    const clientConfig = {
       apiKey: process.env.DASHSCOPE_API_KEY,
       baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    });
+      timeout: 120000, // 120秒超时
+      maxRetries: 0 // 禁用SDK自动重试，使用我们自己的callWithRetry机制
+    };
+
+    this.vlClient = new OpenAI(clientConfig);
+    this.textClient = new OpenAI(clientConfig);
   }
 
   /**
@@ -90,7 +98,7 @@ class AIService {
 }`;
 
       const completion = await this.vlClient.chat.completions.create({
-        model: 'qwen-vl-plus',
+        model: 'qwen3-vl-plus', // 问题4修复: 使用最新的qwen3-vl-plus模型
         messages: [
           {
             role: 'system',

@@ -1,6 +1,7 @@
 const AIService = require('../services/aiService');
 const path = require('path');
 const fs = require('fs');
+const config = require('../config/upload'); // 添加config导入用于路径验证
 
 class AIController {
   constructor() {
@@ -21,8 +22,20 @@ class AIController {
         });
       }
 
+      // 问题3修复: 防止路径遍历攻击
+      const resolvedPath = path.resolve(videoPath);
+      const uploadBaseDir = path.resolve(config.uploadBaseDir || path.join(__dirname, '../../upload'));
+      
+      // 验证文件路径是否在允许的上传目录内
+      if (!resolvedPath.startsWith(uploadBaseDir)) {
+        return res.status(400).json({
+          success: false,
+          error: '非法的文件路径，请使用有效的上传文件'
+        });
+      }
+
       // 验证文件是否存在
-      if (!fs.existsSync(videoPath)) {
+      if (!fs.existsSync(resolvedPath)) {
         return res.status(404).json({
           success: false,
           error: '视频文件不存在'
@@ -30,13 +43,13 @@ class AIController {
       }
 
       // 执行三阶段分析
-      const analysisResult = await this.aiService.analyzeVideoThreeStage(videoPath);
+      const analysisResult = await this.aiService.analyzeVideoThreeStage(resolvedPath);
 
       res.json({
         success: true,
         data: {
           analysisId: `analysis_${Date.now()}`,
-          videoPath,
+          videoPath: resolvedPath,
           ...analysisResult,
           createdAt: new Date().toISOString()
         }
@@ -65,9 +78,22 @@ class AIController {
         });
       }
 
+      // 问题3修复: 防止路径遍历攻击
+      const uploadBaseDir = path.resolve(config.uploadBaseDir || path.join(__dirname, '../../upload'));
+      const resolvedPath1 = path.resolve(video1Path);
+      const resolvedPath2 = path.resolve(video2Path);
+      
+      // 验证两个文件路径是否在允许的上传目录内
+      if (!resolvedPath1.startsWith(uploadBaseDir) || !resolvedPath2.startsWith(uploadBaseDir)) {
+        return res.status(400).json({
+          success: false,
+          error: '非法的文件路径，请使用有效的上传文件'
+        });
+      }
+
       // 验证文件是否存在
-      const video1Exists = fs.existsSync(video1Path);
-      const video2Exists = fs.existsSync(video2Path);
+      const video1Exists = fs.existsSync(resolvedPath1);
+      const video2Exists = fs.existsSync(resolvedPath2);
 
       if (!video1Exists || !video2Exists) {
         return res.status(404).json({
@@ -77,14 +103,14 @@ class AIController {
       }
 
       // 执行融合分析
-      const fusionResult = await this.aiService.analyzeFusionThreeStage(video1Path, video2Path);
+      const fusionResult = await this.aiService.analyzeFusionThreeStage(resolvedPath1, resolvedPath2);
 
       res.json({
         success: true,
         data: {
           fusionId: `fusion_${Date.now()}`,
-          video1Path,
-          video2Path,
+          video1Path: resolvedPath1,
+          video2Path: resolvedPath2,
           ...fusionResult,
           createdAt: new Date().toISOString()
         }

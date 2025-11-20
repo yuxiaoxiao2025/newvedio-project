@@ -1,17 +1,49 @@
 const logger = require('../utils/logger');
+const jwt = require('jsonwebtoken');
 
-// Simple authentication middleware (placeholder for future implementation)
+// Simple authentication middleware with environment-controlled mock
 const requireAuth = (req, res, next) => {
-  // For now, we'll skip authentication as per the practical approach
-  // In a production environment, this would verify JWT tokens or session cookies
+  // 允许在开发环境中跳过认证（通过环境变量控制）
+  if (process.env.NODE_ENV === 'development' && process.env.SKIP_AUTH === 'true') {
+    logger.warn('认证已跳过 - 仅限开发环境使用');
+    req.user = {
+      id: 'dev-user',
+      role: 'admin'
+    };
+    return next();
+  }
 
-  // Set a mock user for development
-  req.user = {
-    id: 'dev-user',
-    role: 'admin'
-  };
+  // 生产环境必须验证JWT token
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      error: 'UNAUTHORIZED',
+      message: '未提供认证令牌，请先登录',
+      timestamp: new Date().toISOString()
+    });
+  }
 
-  next();
+  const token = authHeader.replace('Bearer ', '');
+  
+  try {
+    // 验证JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const decoded = jwt.verify(token, jwtSecret);
+    
+    req.user = {
+      id: decoded.userId || decoded.id,
+      role: decoded.role || 'user'
+    };
+    
+    next();
+  } catch (error) {
+    logger.error('Token验证失败:', error.message);
+    return res.status(401).json({
+      error: 'INVALID_TOKEN',
+      message: '认证令牌无效或已过期',
+      timestamp: new Date().toISOString()
+    });
+  }
 };
 
 // Admin only middleware

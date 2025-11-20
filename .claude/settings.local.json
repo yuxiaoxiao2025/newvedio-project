@@ -5,7 +5,9 @@
       "mcp__mcp-deepwiki__deepwiki_fetch",
       "Skill(vue_cn)",
       "Skill(qwen)",
-      "Skill(vite)"
+      "Skill(vite)",
+      "Skill(express4x)",
+      "Skill(artifacts-builder)"
     ],
     "deny": [],
     "ask": []

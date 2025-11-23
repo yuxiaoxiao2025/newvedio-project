@@ -20,33 +20,23 @@ export function useWebSocket(sessionId) {
 
   // Connect to WebSocket
   const connect = () => {
-    if (!sessionId) {
-      console.warn('WebSocket: No sessionId provided')
-      return
+    if (!socket.value) {
+      socket.value = io('http://localhost:8005', {
+        transports: ['websocket', 'polling'],
+        forceNew: true,
+        timeout: 5000,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000
+      })
     }
-
-    console.log('WebSocket: Connecting to session', sessionId)
-
-    socket.value = io('http://localhost:8005', {
-      transports: ['websocket', 'polling'],
-      forceNew: true,
-      timeout: 5000,
-      reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 1000
-    })
 
     socket.value.on('connect', () => {
       connected.value = true
-      console.log('WebSocket connected')
-
-      // Join session room
-      socket.value.emit('join-session', sessionId)
     })
 
     socket.value.on('disconnect', () => {
       connected.value = false
-      console.log('WebSocket disconnected')
     })
 
     socket.value.on('upload-progress', (data) => {
@@ -79,7 +69,6 @@ export function useWebSocket(sessionId) {
     })
 
     socket.value.on('error', (error) => {
-      console.error('WebSocket error:', error)
       connected.value = false
       if (onError.value) {
         onError.value(error)
@@ -87,21 +76,32 @@ export function useWebSocket(sessionId) {
     })
 
     socket.value.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error)
       connected.value = false
-      // 如果连接失败，设置一个默认的进度状态
       progress.value.message = 'WebSocket连接失败，使用HTTP轮询模式'
-      progress.value.totalProgress = 10 // 设置一个初始进度
+      progress.value.totalProgress = 10
     })
 
     // 设置连接超时
     setTimeout(() => {
       if (!connected.value && progress.value.totalProgress === 0) {
-        console.warn('WebSocket connection timeout, falling back to HTTP polling')
         progress.value.message = '连接超时，切换到HTTP轮询模式'
-        progress.value.totalProgress = 10 // 设置一个初始进度
+        progress.value.totalProgress = 10
       }
     }, 3000)
+  }
+
+  const joinSession = (sid) => {
+    connect()
+    if (socket.value && sid) {
+      socket.value.emit('join-session', sid)
+    }
+    return socket.value
+  }
+
+  const leaveSession = (sid) => {
+    if (socket.value && sid) {
+      socket.value.emit('leave-session', sid)
+    }
   }
 
   // Disconnect from WebSocket
@@ -134,6 +134,8 @@ export function useWebSocket(sessionId) {
     onCompleted,
     onError,
     connect,
-    disconnect
+    disconnect,
+    joinSession,
+    leaveSession
   }
 }

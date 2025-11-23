@@ -1,7 +1,7 @@
-const OpenAI = require('openai');
+const axios = require('axios');
 
 /**
- * AI服务 - 双模型协同架构
+ * AI服务 - 双模型协同架构 (全面使用DashScope原生API)
  * qwen3-vl: 视频理解分析
  * qwen-plus: 文本生成和报告创作
  */
@@ -14,46 +14,35 @@ class AIService {
       );
     }
 
-    // 问题5修复: 添加超时配置，防止请求永久挂起
-    const clientConfig = {
-      apiKey: process.env.DASHSCOPE_API_KEY,
-      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      timeout: 120000, // 120秒超时
-      maxRetries: 0 // 禁用SDK自动重试，使用我们自己的callWithRetry机制
-    };
-
-    this.vlClient = new OpenAI(clientConfig);
-    this.textClient = new OpenAI(clientConfig);
+    // 统一使用DashScope原生API
+    this.apiKey = process.env.DASHSCOPE_API_KEY;
+    this.baseURL = 'https://dashscope.aliyuncs.com/api/v1';
+    this.timeout = 120000; // 120秒超时
   }
 
   /**
-   * qwen3-VL模型 - 增强版视频内容分析
+   * qwen3-VL模型 - 使用DashScope原生API进行视频内容分析
+   * 修复: 使用正确的DashScope API格式处理视频
    */
   async analyzeVideoContent(videoPath, prompt = null) {
     try {
-      const defaultPrompt = `#背景# 专业视频分析师分析上传的视频文件
-#目的# 提取视频的详细视觉信息和内容要素
-#任务步骤#
-1. 识别视频基本信息（时长、分辨率、帧率）
-2. 提取关键帧时间戳和视觉描述
-3. 分析场景变化和类型分类
-4. 检测主要物体和人物
-5. 识别动作序列和行为
-6. 分析色彩构成和光影效果
-7. 评估画面质量和稳定性
-8. 识别情感基调和氛围
+      // 验证视频URL有效性
+      if (!videoPath || typeof videoPath !== 'string') {
+        throw new Error('无效的视频路径');
+      }
 
-#输出格式# 严格的JSON格式：
+      const defaultPrompt = `请分析这个视频文件，提供详细的内容分析。
+
+请按以下JSON格式输出结果：
 {
-  "duration": 秒数,
-  "resolution": "分辨率",
+  "duration": 视频时长（秒），
+  "resolution": "视频分辨率",
   "frameRate": 帧率,
   "keyframes": [
     {
       "timestamp": 时间戳（秒）,
-      "description": "详细视觉描述",
-      "importance": "重要程度（high/medium/low）",
-      "visual_elements": ["视觉元素列表"]
+      "description": "该时间点的画面描述",
+      "importance": "重要程度（high/medium/low）"
     }
   ],
   "scenes": [
@@ -67,8 +56,8 @@ class AIService {
   ],
   "objects": [
     {
-      "name": "物体名称",
-      "confidence": 置信度,
+      "name": "物体或人物名称",
+      "confidence": 置信度（0-1）,
       "first_seen": 首次出现时间,
       "duration": 出现时长
     }
@@ -83,59 +72,127 @@ class AIService {
   ],
   "visual_analysis": {
     "color_palette": ["主要色彩"],
-    "lighting": "光线状况",
+    "lighting": "光线状况描述",
     "composition": "构图特点",
     "movement": "运动特征"
   },
   "quality_assessment": {
-    "sharpness": "清晰度评分",
-    "stability": "稳定性评分",
-    "exposure": "曝光评估",
-    "overall_quality": "整体质量评分"
+    "sharpness": 清晰度评分（1-10）,
+    "stability": 稳定性评分（1-10）,
+    "exposure": 曝光评估,
+    "overall_quality": 整体质量评分（1-10）
   },
-  "emotional_tone": "情感基调",
-  "content_summary": "内容概要"
+  "emotional_tone": "情感基调描述",
+  "content_summary": "视频内容概要"
 }`;
 
-      const completion = await this.vlClient.chat.completions.create({
-        model: 'qwen3-vl-plus', // 问题4修复: 使用最新的qwen3-vl-plus模型
-        messages: [
-          {
-            role: 'system',
-            content: '你是一名专业的视频分析师，具有深厚的视觉分析和内容解读能力。'
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                // 问题11修复: 根据阿里云官方文档，视频URL应使用image_url类型
-                type: 'image_url',
-                image_url: {
-                  url: videoPath
-                }
-              },
-              {
-                type: 'text',
-                text: prompt || defaultPrompt
-              }
-            ]
-          }
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 3000,
-        temperature: 0.3
-      });
+      console.log('开始视频分析，视频路径:', videoPath);
 
-      // 问题10修复: 增强JSON解析的健壮性
-      try {
-        const result = JSON.parse(completion.choices[0].message.content);
-        return result;
-      } catch (parseError) {
-        console.error('AI返回内容JSON解析失败:', {
-          content: completion.choices[0].message.content,
-          error: parseError.message
-        });
-        throw new Error('AI分析结果格式异常,请重试');
+      // 修复: 使用DashScope原生API格式进行视频分析
+      const requestData = {
+        model: 'qwen3-vl-plus',
+        input: {
+          messages: [
+            {
+              role: 'system',
+              content: '你是一名专业的视频分析师，具有深厚的视觉分析和内容解读能力。请用JSON格式返回分析结果。'
+            },
+            {
+              role: 'user',
+              content: [
+                // 修复: DashScope原生格式的content应该是对象数组，每个对象包含一种模态
+                ...(videoPath.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+                  ? [{ image: videoPath }]
+                  : [{ video: videoPath }]
+                ),
+                { text: prompt || defaultPrompt }
+              ]
+            }
+          ]
+        },
+        parameters: {
+          result_format: 'message',
+          max_tokens: 4000,
+          temperature: 0.2
+        }
+      };
+
+      const response = await axios.post(
+        `${this.baseURL}/services/aigc/multimodal-generation/generation`,
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: this.timeout
+        }
+      );
+
+      // 修复: 处理DashScope原生API的响应格式
+      if (response.status !== 200) {
+        throw new Error(`DashScope API调用失败: ${response.status} - ${response.data?.message || '未知错误'}`);
+      }
+
+      const responseData = response.data;
+      if (responseData.output?.choices?.length > 0) {
+        const messageContent = responseData.output.choices[0].message.content;
+
+        // DashScope原生API返回的content可能是数组格式
+        let content = '';
+        if (Array.isArray(messageContent)) {
+          // 如果是数组，提取text内容并拼接
+          content = messageContent
+            .filter(item => item.text)
+            .map(item => item.text)
+            .join('');
+        } else if (typeof messageContent === 'string') {
+          // 如果是字符串，直接使用
+          content = messageContent;
+        } else {
+          throw new Error(`不支持的content格式: ${typeof messageContent}`);
+        }
+
+        console.log('AI返回内容:', content.substring(0, 200) + '...');
+
+        try {
+          const result = JSON.parse(content);
+          console.log('视频分析成功完成');
+          return result;
+        } catch (parseError) {
+          console.error('AI返回内容JSON解析失败:', {
+            content: content,
+            error: parseError.message
+          });
+
+          // 如果JSON解析失败，尝试返回原始内容作为基础结果
+          return {
+            duration: 0,
+            resolution: "unknown",
+            frameRate: 0,
+            keyframes: [],
+            scenes: [],
+            objects: [],
+            actions: [],
+            visual_analysis: {
+              color_palette: [],
+              lighting: "unknown",
+              composition: "unknown",
+              movement: "unknown"
+            },
+            quality_assessment: {
+              sharpness: 5,
+              stability: 5,
+              exposure: "unknown",
+              overall_quality: 5
+            },
+            emotional_tone: "neutral",
+            content_summary: typeof content === 'string' ? content.substring(0, 500) : '无法解析的内容',
+            parse_error: true
+          };
+        }
+      } else {
+        throw new Error(`DashScope API返回格式异常: ${JSON.stringify(responseData)}`);
       }
     } catch (error) {
       console.error('VL模型分析失败:', error);
@@ -144,7 +201,7 @@ class AIService {
   }
 
   /**
-   * qwen-plus模型 - 文本生成（报告创作）- 基于Qwen官方异步处理优化
+   * qwen-plus模型 - 使用DashScope原生API进行文本生成（报告创作）
    */
   async generateVideoReport(analysisData, reportType = 'content', stream = false) {
     try {
@@ -152,56 +209,45 @@ class AIService {
 
       switch (reportType) {
         case 'content':
-          prompt = `#背景# 专业视频内容分析数据：${JSON.stringify(analysisData)}
-#目的# 生成全面的视频内容分析报告
-#风格# 专业视频分析师，数据驱动，客观准确，具有洞察力
-#受众# 视频制作专业人士和内容创作者
-#输出要求# 生成包含以下结构的详细分析报告：
+          prompt = `请基于以下视频内容分析数据，生成全面的视频内容分析报告：
 
-## 📊 视频基本信息
+分析数据：${JSON.stringify(analysisData)}
+
+请按照以下结构生成详细的分析报告：
+
+## 视频基本信息
 - 视频时长分析和节奏评估
 - 技术参数解读（分辨率、帧率等）
 
-## 🎬 关键帧深度解读
+## 关键帧深度解读
 - 每个关键帧的视觉元素分析
 - 构图和美学价值评估
 - 重要程度分级说明
 
-## 🌈 场景专业分析
+## 场景专业分析
 - 场景类型分类和特征
 - 场景转换逻辑
 - 空间关系和氛围营造
 
-## 🔍 内容要素识别
+## 内容要素识别
 - 物体检测和意义解读
 - 动作序列分析
 - 人物行为分析
 
-## 💫 情感与美学评估
+## 情感与美学评估
 - 情感基调和变化曲线
 - 色彩构成和视觉效果
 - 画面质量专业评估
 
-## 📈 内容价值评估
+## 内容价值评估
 - 内容完整性评估
 - 视觉冲击力评分
 - 传播价值分析
 
-## 💡 专业建议
+## 专业建议
 - 改进建议
 - 应用场景推荐
-- 优化方向
-
-#任务步骤#
-1. 深度分析视频时长特征和内容节奏
-2. 专业解读每个关键帧的视觉元素和构图特点
-3. 对场景进行专业分类，分析转换逻辑
-4. 详细分析物体检测结果的含义和重要性
-5. 解读动作序列的叙事逻辑
-6. 评估整体情感基调和变化趋势
-7. 分析色彩分布、光影效果和视觉冲击力
-8. 综合评估画面质量和专业水准
-9. 提供具有实用价值的专业建议`;
+- 优化方向`;
           break;
 
         case 'fusion':
@@ -306,62 +352,62 @@ class AIService {
 
 # 情感曲线设计
 ## 开头部分 (0-10秒)
-- **情绪起点**: [具体情绪状态，如平静引入、渐强开始]
-- **音量级别**: [具体的音量描述，如 medium-low]
-- **主要乐器**: [开场使用的主要乐器，如钢琴、弦乐]
-- **节奏特征**: [节奏描述，如缓慢稳定、中等速度]
+- **情绪起点**: 具体情绪状态，如平静引入、渐强开始
+- **音量级别**: 具体的音量描述，如 medium-low
+- **主要乐器**: 开场使用的主要乐器，如钢琴、弦乐
+- **节奏特征**: 节奏描述，如缓慢稳定、中等速度
 
 ## 发展部分 (10-30秒)
-- **情绪演进**: [如何推进情绪，如逐渐上升、保持稳定]
-- **音量调整**: [音量变化，如渐强、保持一致]
-- **乐器叠加**: [新增的乐器和层次，如鼓点加入、合成器铺垫]
-- **节奏变化**: [节奏的调整，如加快、加强、保持]
+- **情绪演进**: 如何推进情绪，如逐渐上升、保持稳定
+- **音量调整**: 音量变化，如渐强、保持一致
+- **乐器叠加**: 新增的乐器和层次，如鼓点加入、合成器铺垫
+- **节奏变化**: 节奏的调整，如加快、加强、保持
 
 ## 收尾部分 (30-45秒)
-- **情绪归宿**: [结尾情绪，如渐弱收束、高潮结束]
-- **音量处理**: [收尾的音量处理，如淡出、突然停止]
-- **乐器退出**: [乐器退出顺序，如弦乐先退、钢琴最后]
-- **节奏放缓**: [结尾的节奏处理]
+- **情绪归宿**: 结尾情绪，如渐弱收束、高潮结束
+- **音量处理**: 收尾的音量处理，如淡出、突然停止
+- **乐器退出**: 乐器退出顺序，如弦乐先退、钢琴最后
+- **节奏放缓**: 结尾的节奏处理
 
 # 乐器配置详情
 ## 主要乐器
-1. **主奏乐器**: [乐器名称] - [具体作用和表现效果]
-2. **辅助乐器**: [乐器名称] - [与主奏的配合方式]
+1. **主奏乐器**: 乐器名称 - 具体作用和表现效果
+2. **辅助乐器**: 乐器名称 - 与主奏的配合方式
 
 ## 和声层次
-1. **基础和声**: [和声乐器] - [和声进行方式]
-2. **丰富和声**: [其他和声乐器] - [增加的层次感]
+1. **基础和声**: 和声乐器 - 和声进行方式
+2. **丰富和声**: 其他和声乐器 - 增加的层次感
 
 ## 节奏元素
-1. **基础节奏**: [鼓点类型] - [节奏模式描述]
-2. **辅助节奏**: [其他节奏元素] - [复杂度描述]
+1. **基础节奏**: 鼓点类型 - 节奏模式描述
+2. **辅助节奏**: 其他节奏元素 - 复杂度描述
 
 ## 音效元素
-1. **环境音效**: [音效类型] - [使用时机]
-2. **特殊效果**: [特效音] - [具体应用位置]
+1. **环境音效**: 音效类型 - 使用时机
+2. **特殊效果**: 特效音 - 具体应用位置
 
 # 技术参数设定
 ## 基础参数
-- **速度**: [BPM范围，如80-120 BPM的具体数值]
-- **调性**: [建议调性，如C大调、A小调等]
-- **拍号**: [拍号，如4/4拍、3/4拍等]
-- **音色特征**: [整体音色描述，如温暖、明亮等]
+- **速度**: BPM范围，如80-120 BPM的具体数值
+- **调性**: 建议调性，如C大调、A小调等
+- **拍号**: 拍号，如4/4拍、3/4拍等
+- **音色特征**: 整体音色描述，如温暖、明亮等
 
 ## 音效处理
-- **混响**: [混响效果描述，如空间感大小]
-- **均衡**: [EQ调整建议]
-- **压缩**: [动态处理建议]
+- **混响**: 混响效果描述，如空间感大小
+- **均衡**: EQ调整建议
+- **压缩**: 动态处理建议
 
 # 风格融合策略
 ## 主导风格 (70%)
-- **风格**: [主要音乐风格，如Cinematic、Ambient等]
-- **特征**: [该风格的典型特征]
-- **应用**: [在45秒中的主要应用段落]
+- **风格**: 主要音乐风格，如Cinematic、Ambient等
+- **特征**: 该风格的典型特征
+- **应用**: 在45秒中的主要应用段落
 
 ## 辅助风格 (30%)
-- **风格**: [辅助音乐风格，如Electronic、Classical等]
-- **特征**: [该风格的特点]
-- **应用**: [与主导风格的融合方式]
+- **风格**: 辅助音乐风格，如Electronic、Classical等
+- **特征**: 该风格的特点
+- **应用**: 与主导风格的融合方式
 
 # AI音乐生成专用提示
 ## 综合提示词
@@ -369,13 +415,13 @@ class AIService {
 
 ## 分段详细提示
 ### 第一段 (0-15秒)
-[详细的15秒音乐描述，包括乐器、情绪、节奏等具体要求]
+详细的15秒音乐描述，包括乐器、情绪、节奏等具体要求
 
 ### 第二段 (15-30秒)
-[详细的15秒音乐描述，强调情绪的发展和乐器变化]
+详细的15秒音乐描述，强调情绪的发展和乐器变化
 
 ### 第三段 (30-45秒)
-[详细的15秒音乐描述，描述高潮和收尾的处理]
+详细的15秒音乐描述，描述高潮和收尾的处理
 
 # 质量标准要求
 - **音质品质**: 高清无损，专业制作水准
@@ -388,44 +434,107 @@ class AIService {
           break;
       }
 
-      // 基于Qwen官方建议的优化配置
-      const completionConfig = {
+      // 使用DashScope原生API进行文本生成
+      const requestData = {
         model: 'qwen-plus',
-        messages: [
-          {
-            role: 'system',
-            content: '你是一位专业的视频分析师和音乐制作人，具有丰富的行业经验和深厚的专业知识。你擅长生成结构化的分析报告、创意方案和技术指导。你的回答总是准确、详细、实用，并且具有专业的洞察力。'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3, // 降低temperature以获得更一致的专业输出
-        max_tokens: 4000, // 增加token限制以支持详细输出
-        top_p: 0.8, // 使用nucleus sampling
-        frequency_penalty: 0.1, // 减少重复
-        presence_penalty: 0.1, // 鼓励新的话题
-        stream: stream // 支持流式响应
+        input: {
+          messages: [
+            {
+              role: 'system',
+              content: '你是一位专业的视频分析师和音乐制作人，具有丰富的行业经验和深厚的专业知识。你擅长生成结构化的分析报告、创意方案和技术指导。你的回答总是准确、详细、实用，并且具有专业的洞察力。'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        },
+        parameters: {
+          result_format: 'message',
+          max_tokens: 4000,
+          temperature: 0.3,
+          top_p: 0.8,
+          repetition_penalty: 1.1, // DashScope使用repetition_penalty而不是frequency/presence penalty
+          stream: stream
+        }
       };
 
+      console.log('开始文本生成，类型:', reportType);
+
       if (stream) {
-        // 基于Qwen官方建议的流式响应处理
-        const streamResponse = await this.textClient.chat.completions.create(completionConfig);
+        // 流式响应处理
+        const response = await axios.post(
+          `${this.baseURL}/services/aigc/text-generation/generation`,
+          requestData,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: this.timeout,
+            responseType: 'stream'
+          }
+        );
+
         let fullContent = '';
 
-        for await (const chunk of streamResponse) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            fullContent += content;
-          }
-        }
+        return new Promise((resolve, reject) => {
+          response.data.on('data', (chunk) => {
+            const lines = chunk.toString().split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  resolve(fullContent);
+                  return;
+                }
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.output?.choices?.[0]?.message?.content;
+                  if (content) {
+                    fullContent += content;
+                  }
+                } catch (e) {
+                  // 忽略解析错误
+                }
+              }
+            }
+          });
 
-        return fullContent;
+          response.data.on('error', (error) => {
+            reject(error);
+          });
+
+          response.data.on('end', () => {
+            resolve(fullContent);
+          });
+        });
       } else {
         // 标准异步处理
-        const completion = await this.textClient.chat.completions.create(completionConfig);
-        return completion.choices[0].message.content;
+        const response = await axios.post(
+          `${this.baseURL}/services/aigc/text-generation/generation`,
+          requestData,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: this.timeout
+          }
+        );
+
+        if (response.status !== 200) {
+          throw new Error(`DashScope文本生成API调用失败: ${response.status} - ${response.data?.message || '未知错误'}`);
+        }
+
+        const responseData = response.data;
+        if (responseData.output?.choices?.length > 0) {
+          const content = responseData.output.choices[0].message.content;
+          console.log('文本生成成功完成，长度:', content.length);
+          return content;
+        } else {
+          throw new Error(`DashScope文本生成API返回格式异常: ${JSON.stringify(responseData)}`);
+        }
       }
     } catch (error) {
       console.error('文本生成失败:', error);
@@ -449,9 +558,16 @@ class AIService {
         });
       }
 
-      const vlAnalysis = await this.callWithRetry(() =>
-        this.analyzeVideoContent(videoPath)
-      );
+      let vlAnalysis;
+      try {
+        vlAnalysis = await this.callWithRetry(() => this.analyzeVideoContent(videoPath));
+      } catch (e) {
+        if (this.isExternalAIError(e)) {
+          vlAnalysis = {};
+        } else {
+          throw e;
+        }
+      }
 
       if (io && sessionId) {
         io.to(`session:${sessionId}`).emit('analysis:progress', {
@@ -493,9 +609,20 @@ class AIService {
         });
       }
 
-      const finalReport = await this.callWithRetry(() =>
-        this.generateVideoReport(structuredData, 'content')
-      );
+      let finalReport;
+      try {
+        finalReport = await this.callWithRetry(() => this.generateVideoReport(structuredData, 'content'));
+      } catch (e) {
+        if (this.isExternalAIError(e)) {
+          finalReport = JSON.stringify({
+            summary: '本地降级生成的内容分析报告',
+            videoInfo: structuredData.videoInfo,
+            notes: '外部AI服务不可用，已使用降级策略生成概要'
+          });
+        } else {
+          throw e;
+        }
+      }
 
       if (io && sessionId) {
         io.to(`session:${sessionId}`).emit('analysis:progress', {
@@ -541,10 +668,26 @@ class AIService {
         });
       }
 
-      const [video1Analysis, video2Analysis] = await Promise.all([
-        this.callWithRetry(() => this.analyzeVideoContent(video1Path)),
-        this.callWithRetry(() => this.analyzeVideoContent(video2Path))
-      ]);
+      let video1Analysis;
+      let video2Analysis;
+      try {
+        video1Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video1Path));
+      } catch (e) {
+        if (this.isExternalAIError(e)) {
+          video1Analysis = {};
+        } else {
+          throw e;
+        }
+      }
+      try {
+        video2Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video2Path));
+      } catch (e) {
+        if (this.isExternalAIError(e)) {
+          video2Analysis = {};
+        } else {
+          throw e;
+        }
+      }
 
       if (io && sessionId) {
         io.to(`session:${sessionId}`).emit('analysis:progress', {
@@ -586,9 +729,20 @@ class AIService {
         });
       }
 
-      const fusionPlan = await this.callWithRetry(() =>
-        this.generateVideoReport(fusionData, 'fusion')
-      );
+      let fusionPlan;
+      try {
+        fusionPlan = await this.callWithRetry(() => this.generateVideoReport(fusionData, 'fusion'));
+      } catch (e) {
+        if (this.isExternalAIError(e)) {
+          fusionPlan = JSON.stringify({
+            summary: '本地降级生成的融合方案',
+            totalDuration: fusionData.totalDuration,
+            notes: '外部AI服务不可用，已使用降级策略生成概要'
+          });
+        } else {
+          throw e;
+        }
+      }
 
       if (io && sessionId) {
         io.to(`session:${sessionId}`).emit('analysis:progress', {
@@ -828,6 +982,14 @@ class AIService {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
+  }
+
+  isExternalAIError(error) {
+    const s = error && (error.status || error.httpStatus);
+    const c = error && error.code;
+    if (s && [429, 500, 502, 503, 504].includes(Number(s))) return true;
+    if (typeof c === 'string' && ['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT'].includes(c)) return true;
+    return false;
   }
 }
 

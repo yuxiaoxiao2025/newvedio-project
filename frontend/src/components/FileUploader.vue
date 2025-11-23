@@ -212,32 +212,37 @@ export default {
       errorMessage.value = ''
 
       try {
-        // 验证文件
         const validationData = {
           files: files.value.map(file => ({
             name: file.name,
             size: file.size,
-            type: file.type
+            type: file.type || ''
           }))
         }
 
         const response = await fetch('/api/upload/validate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(validationData)
         })
 
-        const result = await response.json()
-
-        if (!response.ok || !result.valid) {
-          throw new Error(result.message || '文件验证失败')
+        // 兼容代理/网络错误返回text/plain空响应
+        let result = null
+        try {
+          result = await response.json()
+        } catch (_) {
+          result = null
         }
 
-        // 发出文件选择事件
-        emit('files-selected', files.value)
+        if (!response.ok) {
+          throw new Error('服务器不可用或网络故障，请稍后重试')
+        }
 
+        if (!result?.valid) {
+          throw new Error('文件验证失败，请检查格式与大小限制')
+        }
+
+        emit('files-selected', files.value)
       } catch (error) {
         errorMessage.value = error.message || '上传失败，请重试'
       } finally {

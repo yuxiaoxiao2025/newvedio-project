@@ -32,12 +32,16 @@ const fileFilter = (req, file, cb) => {
     return cb(error, false);
   }
 
-  // Check MIME type
-  if (!config.allowedMimeTypes.includes(file.mimetype)) {
-    const error = new Error('不支持的文件类型');
-    error.code = 'INVALID_MIME_TYPE';
-    error.allowedTypes = config.allowedMimeTypes;
-    return cb(error, false);
+  // Check MIME type: 兼容某些浏览器未提供或不一致的MIME
+  if (file.mimetype && !config.allowedMimeTypes.includes(file.mimetype)) {
+    // 若扩展名允许但MIME不匹配，仍允许上传，后续由服务层做进一步校验
+    const extAllowed = config.allowedExtensions.includes(ext);
+    if (!extAllowed) {
+      const error = new Error('不支持的文件类型');
+      error.code = 'INVALID_MIME_TYPE';
+      error.allowedTypes = config.allowedMimeTypes;
+      return cb(error, false);
+    }
   }
 
   cb(null, true);

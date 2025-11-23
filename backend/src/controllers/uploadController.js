@@ -12,7 +12,8 @@ const fileValidationSchema = Joi.object({
     Joi.object({
       name: Joi.string().required(),
       size: Joi.number().integer().min(1).max(config.maxFileSize).required(),
-      type: Joi.string().valid(...config.allowedMimeTypes).required()
+      // 允许缺失或未知的 MIME，由服务层进行更严格校验
+      type: Joi.string().allow('').optional()
     })
   ).min(1).max(3).required()
 });

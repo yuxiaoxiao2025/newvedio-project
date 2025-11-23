@@ -75,7 +75,7 @@
                 </button>
 
                 <button
-                  @click="handleUploadComplete"
+                  @click="handleSkipAnalysis"
                   :disabled="isAnalyzing"
                   class="btn btn-success"
                   style="margin-bottom: 8px;"
@@ -227,6 +227,8 @@ export default {
       analysisResult,
       formattedResult,
       error: analysisError,
+      analyzeVideoContent,
+      analyzeVideoFusion,
       analyzeUploadedFiles,
       generateMusicPrompt,
       resetAnalysis
@@ -353,6 +355,10 @@ export default {
       currentStep.value = 'completed'
     }
 
+    const handleSkipAnalysis = () => {
+      currentStep.value = 'finished'
+    }
+
     // 处理上传取消
     const handleUploadCancel = () => {
       currentStep.value = 'selection'
@@ -375,13 +381,11 @@ export default {
         resetAnalysis()
 
         if (type === 'content') {
-          // 内容分析 - 使用第一个文件
-          const filesForAnalysis = uploadedFilesData.value.slice(0, 1)
-          await analyzeUploadedFiles(filesForAnalysis, filesForAnalysis[0].category, 'content')
+          const [file] = uploadedFilesData.value
+          await analyzeVideoContent({ path: file.path, category: file.category, sessionId: sessionId.value })
         } else if (type === 'fusion') {
-          // 融合分析 - 使用前两个文件
-          const filesForFusion = uploadedFilesData.value.slice(0, 2)
-          await analyzeUploadedFiles(filesForFusion, filesForFusion[0].category, 'fusion')
+          const [file1, file2] = uploadedFilesData.value
+          await analyzeVideoFusion({ path: file1.path, category: file1.category, sessionId: sessionId.value }, { path: file2.path, category: file2.category, sessionId: sessionId.value })
         }
 
         // 分析完成后跳转到结果展示页面
@@ -513,7 +517,8 @@ export default {
       handleAnalysisComplete,
       handleAnalysisCancel,
       getAnalysisTypeText,
-      getAnalysisResultTitle
+      getAnalysisResultTitle,
+      handleSkipAnalysis
     }
   }
 }

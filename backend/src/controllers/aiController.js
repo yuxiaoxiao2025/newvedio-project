@@ -32,7 +32,11 @@ class AIController {
       }
 
       // 问题3修复: 防止路径遍历攻击
-      const resolvedPath = path.resolve(videoPath);
+      let inputPath = videoPath;
+      if (/^\/uploads\//.test(videoPath)) {
+        inputPath = path.join(uploadBaseDir, videoPath.replace(/^\/uploads\//, ''));
+      }
+      const resolvedPath = path.resolve(inputPath);
       const uploadBaseDir = path.resolve(config.uploadBaseDir || path.join(__dirname, '../../upload'));
       
       // 验证文件路径是否在允许的上传目录内
@@ -51,10 +55,13 @@ class AIController {
         });
       }
 
-      // 执行三阶段分析
-      const io = req.app.get('io'); // 获取Socket.IO实例
-      const sessionId = req.body.sessionId || req.headers['x-session-id']; // 从请求中获取sessionId
-      const analysisResult = await this.aiService.analyzeVideoThreeStage(resolvedPath, io, sessionId);
+      // 构造可访问的文件URL
+      const relativePath = path.relative(uploadBaseDir, resolvedPath).replace(/\\/g, '/');
+      const videoUrl = `${req.protocol}://${req.get('host')}/uploads/${relativePath}`;
+
+      const io = req.app.get('io');
+      const sessionId = req.body.sessionId || req.headers['x-session-id'];
+      const analysisResult = await this.aiService.analyzeVideoThreeStage(videoUrl, io, sessionId);
 
       res.json({
         success: true,
@@ -107,8 +114,16 @@ class AIController {
 
       // 问题3修复: 防止路径遍历攻击
       const uploadBaseDir = path.resolve(config.uploadBaseDir || path.join(__dirname, '../../upload'));
-      const resolvedPath1 = path.resolve(video1Path);
-      const resolvedPath2 = path.resolve(video2Path);
+      let inputPath1 = video1Path;
+      let inputPath2 = video2Path;
+      if (/^\/uploads\//.test(video1Path)) {
+        inputPath1 = path.join(uploadBaseDir, video1Path.replace(/^\/uploads\//, ''));
+      }
+      if (/^\/uploads\//.test(video2Path)) {
+        inputPath2 = path.join(uploadBaseDir, video2Path.replace(/^\/uploads\//, ''));
+      }
+      const resolvedPath1 = path.resolve(inputPath1);
+      const resolvedPath2 = path.resolve(inputPath2);
       
       // 验证两个文件路径是否在允许的上传目录内
       if (!resolvedPath1.startsWith(uploadBaseDir) || !resolvedPath2.startsWith(uploadBaseDir)) {
@@ -129,10 +144,14 @@ class AIController {
         });
       }
 
-      // 执行融合分析
-      const io = req.app.get('io'); // 获取Socket.IO实例
-      const sessionId = req.body.sessionId || req.headers['x-session-id']; // 从请求中获取sessionId
-      const fusionResult = await this.aiService.analyzeFusionThreeStage(resolvedPath1, resolvedPath2, io, sessionId);
+      const relative1 = path.relative(uploadBaseDir, resolvedPath1).replace(/\\/g, '/');
+      const relative2 = path.relative(uploadBaseDir, resolvedPath2).replace(/\\/g, '/');
+      const url1 = `${req.protocol}://${req.get('host')}/uploads/${relative1}`;
+      const url2 = `${req.protocol}://${req.get('host')}/uploads/${relative2}`;
+
+      const io = req.app.get('io');
+      const sessionId = req.body.sessionId || req.headers['x-session-id'];
+      const fusionResult = await this.aiService.analyzeFusionThreeStage(url1, url2, io, sessionId);
 
       res.json({
         success: true,

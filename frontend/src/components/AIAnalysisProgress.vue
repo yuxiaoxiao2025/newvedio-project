@@ -63,7 +63,7 @@
       </div>
 
       <!-- 实时日志 -->
-      <div class="progress-logs" v-if="logs.length > 0">
+      <div class="progress-logs" v-if="displayedLogs && displayedLogs.length > 0">
         <div class="logs-header">
           <span>处理日志</span>
           <button

@@ -350,7 +350,7 @@ export default {
 
     // 处理上传完成
     const handleUploadComplete = () => {
-      currentStep.value = 'finished'
+      currentStep.value = 'completed'
     }
 
     // 处理上传取消

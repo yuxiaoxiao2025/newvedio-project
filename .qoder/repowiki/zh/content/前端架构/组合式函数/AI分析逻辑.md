@@ -1,4 +1,4 @@
-# AI分析逻辑深度解析
+# AI分析逻辑
 
 <cite>
 **本文档引用的文件**
@@ -12,6 +12,14 @@
 - [AnalysisResultDisplay.vue](file://frontend/src/components/AnalysisResultDisplay.vue)
 - [App.vue](file://frontend/src/App.vue)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增了关于`buildVideoSummary`函数的详细说明，该函数用于智能合并原始分析和结构化数据源
+- 在核心方法详解部分添加了`buildVideoSummary`函数的分析
+- 在响应式状态管理部分更新了`formattedResult`计算属性的说明
+- 在UI组件集成部分更新了`ContentAnalysisView`和`FusionAnalysisView`组件的集成说明
+- 所有新增和更新的内容均添加了相应的来源引用
 
 ## 目录
 1. [概述](#概述)
@@ -213,6 +221,47 @@ J --> L[状态重置]
 **流程图来源**
 - [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L249-L298)
 
+### buildVideoSummary - 视频摘要构建
+
+buildVideoSummary函数是useAIAnalysis.js中新增的核心功能，负责智能合并原始分析和结构化数据源，生成统一的视频信息摘要。
+
+#### 函数特点
+- **数据源合并**：同时处理原始分析数据（rawAnalysis）和结构化数据（structuredData）
+- **优先级策略**：优先使用结构化数据，原始数据作为后备
+- **智能统计**：自动计算关键帧、场景、物体和动作的数量
+- **数据验证**：确保所有字段都有有效值，避免undefined或null
+
+#### 实现细节
+
+```mermaid
+flowchart TD
+A[开始构建摘要] --> B[提取结构化数据]
+B --> C[提取原始分析数据]
+C --> D[合并数据源]
+D --> E[应用优先级规则]
+E --> F[处理边界情况]
+F --> G[返回统一摘要]
+```
+
+**流程图来源**
+- [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L495-L524)
+
+#### 数据合并策略
+
+| 字段 | 优先级 | 备注 |
+|------|--------|------|
+| duration | structuredData > rawAnalysis | 优先使用结构化时长 |
+| frameRate | structuredData > rawAnalysis | 优先使用结构化帧率 |
+| resolution | structuredData > rawAnalysis | 优先使用结构化分辨率 |
+| frames | structuredData > rawAnalysis | 优先使用结构化帧数 |
+| keyframeCount | structuredData > rawAnalysis | 结构化数据优先，原始数据后备 |
+| sceneCount | structuredData > rawAnalysis | 结构化数据优先，原始数据后备 |
+| objectCount | structuredData > rawAnalysis | 结构化数据优先，原始数据后备 |
+| actionCount | structuredData > rawAnalysis | 结构化数据优先，原始数据后备 |
+
+**表格来源**
+- [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L512-L521)
+
 ## 响应式状态管理
 
 ### 状态变量设计
@@ -266,6 +315,33 @@ note right of Failed : isAnalyzing = false<br/>error = '错误信息'
 - [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L34-L38)
 - [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L62-L63)
 - [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L96-L98)
+
+### formattedResult - 格式化结果计算属性
+
+formattedResult是useAIAnalysis中的计算属性，负责将原始分析结果转换为用户友好的格式，其中包含了对`buildVideoSummary`函数的调用。
+
+#### 核心功能
+- **数据整合**：将原始分析结果、结构化数据和最终报告整合为统一格式
+- **摘要生成**：调用`buildVideoSummary`函数生成视频信息摘要
+- **类型区分**：根据不同分析类型提供相应的结果结构
+- **错误处理**：确保在数据缺失时仍能提供有意义的默认值
+
+#### 数据处理流程
+
+```mermaid
+flowchart TD
+A[接收原始分析结果] --> B[检查结果有效性]
+B --> C{结果有效?}
+C --> |是| D[调用buildVideoSummary]
+C --> |否| E[返回空结果]
+D --> F[构建内容分析结果]
+F --> G[构建融合分析结果]
+G --> H[构建音乐提示词结果]
+H --> I[返回格式化结果]
+```
+
+**流程图来源**
+- [useAIAnalysis.js](file://frontend/src/composables/useAIAnalysis.js#L479-L548)
 
 ## 本地存储策略
 

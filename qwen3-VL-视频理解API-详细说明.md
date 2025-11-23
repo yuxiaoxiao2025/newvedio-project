@@ -12,31 +12,40 @@
 以下示例演示了如何调用模型描述图像内容。关于本地文件和图像限制的说明，请参见如何传入本地文件、图像限制章节。
 
 OpenAI兼容DashScope
-PythonJavacurl
+PythonNode.jscurl
  
 import os
-import dashscope
-# 若使用新加坡地域的模型，请取消下列注释
-# dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+from openai import OpenAI
 
-messages = [
-{
-    "role": "user",
-    "content": [
-    {"image": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"},
-    {"text": "图中描绘的是什么景象?"}]
-}]
-response = dashscope.MultiModalConversation.call(
-    # 若没有配置环境变量， 请用百炼API Key将下行替换为： api_key ="sk-xxx"
+client = OpenAI(
+    # 若没有配置环境变量，请用阿里云百炼API Key将下行替换为：api_key="sk-xxx",
     # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
-    api_key = os.getenv('DASHSCOPE_API_KEY'),
-    model = 'qwen3-vl-plus',  # 此处以qwen3-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
-    messages = messages
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    # 以下是北京地域base_url，如果使用新加坡地域的模型，需要将base_url替换为：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
-print(response.output.choices[0].message.content[0]["text"])
+
+completion = client.chat.completions.create(
+    model="qwen3-vl-plus", # 此处以qwen3-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"
+                    },
+                },
+                {"type": "text", "text": "图中描绘的是什么景象?"},
+            ],
+        },
+    ],
+)
+print(completion.choices[0].message.content)
 返回结果
  
-是一张在海滩上拍摄的照片。照片中有一位女士和一只狗。女士坐在沙滩上，微笑着与狗互动。狗戴着项圈，似乎在与女士握手。背景是大海和天空，阳光洒在她们身上，营造出温馨的氛围。
+这是一张在海滩上拍摄的照片。照片中，一个人和一只狗坐在沙滩上，背景是大海和天空。人和狗似乎在互动，狗的前爪搭在人的手上。阳光从画面的右侧照射过来，给整个场景增添了一种温暖的氛围。
 模型选型
 对于如高精度的物体识别与定位（包括 3D 定位）、 Agent 工具调用、文档和网页解析、复杂题目解答、长视频理解等任务，首选 Qwen3-VL，系列内模型对比如下：
 
@@ -220,74 +229,84 @@ qwen3-vl-235b-a22b-thinking等带thinking后缀的属于仅思考模型，模型
 限制思考长度：深度思考模型有时会输出冗长的推理过程，可使用 thinking_budget 参数限制思考过程的长度。若模型思考过程生成的 Token 数超过thinking_budget，推理内容会进行截断并立刻开始生成最终回复内容。thinking_budget 默认值为模型的最大思维链长度，请参见模型列表。
 
 OpenAI 兼容DashScope
-PythonJavacurl
+enable_thinking非 OpenAI 标准参数，若使用 OpenAI Python SDK 请通过 extra_body传入。
+
+PythonNode.jscurl
 
  
+from openai import OpenAI
 import os
-import dashscope
-from dashscope import MultiModalConversation
 
-# 若使用新加坡地域的模型，请取消下列注释
-# dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
-enable_thinking=True
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"image": "https://img.alicdn.com/imgextra/i1/O1CN01gDEY8M1W114Hi3XcN_!!6000000002727-0-tps-1024-406.jpg"},
-            {"text": "解答这道题？"}
-        ]
-    }
-]
-
-response = MultiModalConversation.call(
-    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
-    api_key=os.getenv('DASHSCOPE_API_KEY'),
-    model="qwen3-vl-plus",
-    messages=messages,
-    stream=True,
-    # enable_thinking 参数开启思考过程
-    # qwen3-vl-plus、 qwen3-vl-flash可通过enable_thinking开启或关闭思考、对于qwen3-vl-235b-a22b-thinking等带thinking后缀的模型，enable_thinking仅支持设置为开启，对其他Qwen-VL模型均不适用
-    enable_thinking=enable_thinking,
-    # thinking_budget 参数设置最大推理过程 Token 数
-    thinking_budget=81920,
-
+# 初始化OpenAI客户端
+client = OpenAI(
+    # 若没有配置环境变量，请用阿里云百炼API Key将下行替换为：api_key="sk-xxx",
+    # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    # 以下是北京地域base_url，如果使用新加坡地域的模型，需要将base_url替换为：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 
-# 定义完整思考过程
-reasoning_content = ""
-# 定义完整回复
-answer_content = ""
-# 判断是否结束思考过程并开始回复
-is_answering = False
+reasoning_content = ""  # 定义完整思考过程
+answer_content = ""     # 定义完整回复
+is_answering = False   # 判断是否结束思考过程并开始回复
+enable_thinking = True
+# 创建聊天完成请求
+completion = client.chat.completions.create(
+    model="qwen3-vl-plus",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://img.alicdn.com/imgextra/i1/O1CN01gDEY8M1W114Hi3XcN_!!6000000002727-0-tps-1024-406.jpg"
+                    },
+                },
+                {"type": "text", "text": "这道题怎么解答？"},
+            ],
+        },
+    ],
+    stream=True,
+    # enable_thinking 参数开启思考过程，thinking_budget 参数设置最大推理过程 Token 数
+    # qwen3-vl-plus、 qwen3-vl-flash可通过enable_thinking开启或关闭思考、对于qwen3-vl-235b-a22b-thinking等带thinking后缀的模型，enable_thinking仅支持设置为开启，对其他Qwen-VL模型均不适用
+    extra_body={
+        'enable_thinking': enable_thinking,
+        "thinking_budget": 81920},
+
+    # 解除以下注释会在最后一个chunk返回Token使用量
+    # stream_options={
+    #     "include_usage": True
+    # }
+)
+
 if enable_thinking:
-    print("=" * 20 + "思考过程" + "=" * 20)
+    print("\n" + "=" * 20 + "思考过程" + "=" * 20 + "\n")
 
-for chunk in response:
-    # 如果思考过程与回复皆为空，则忽略
-    message = chunk.output.choices[0].message
-    reasoning_content_chunk = message.get("reasoning_content", None)
-    if (chunk.output.choices[0].message.content == [] and
-        reasoning_content_chunk == ""):
-        pass
+for chunk in completion:
+    # 如果chunk.choices为空，则打印usage
+    if not chunk.choices:
+        print("\nUsage:")
+        print(chunk.usage)
     else:
-        # 如果当前为思考过程
-        if reasoning_content_chunk != None and chunk.output.choices[0].message.content == []:
-            print(chunk.output.choices[0].message.reasoning_content, end="")
-            reasoning_content += chunk.output.choices[0].message.reasoning_content
-        # 如果当前为回复
-        elif chunk.output.choices[0].message.content != []:
-            if not is_answering:
-                print("\n" + "=" * 20 + "完整回复" + "=" * 20)
+        delta = chunk.choices[0].delta
+        # 打印思考过程
+        if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
+            print(delta.reasoning_content, end='', flush=True)
+            reasoning_content += delta.reasoning_content
+        else:
+            # 开始回复
+            if delta.content != "" and is_answering is False:
+                print("\n" + "=" * 20 + "完整回复" + "=" * 20 + "\n")
                 is_answering = True
-            print(chunk.output.choices[0].message.content[0]["text"], end="")
-            answer_content += chunk.output.choices[0].message.content[0]["text"]
+            # 打印回复过程
+            print(delta.content, end='', flush=True)
+            answer_content += delta.content
 
-# 如果您需要打印完整思考过程与完整回复，请将以下代码解除注释后运行
 # print("=" * 20 + "完整思考过程" + "=" * 20 + "\n")
-# print(f"{reasoning_content}")
+# print(reasoning_content)
 # print("=" * 20 + "完整回复" + "=" * 20 + "\n")
-# print(f"{answer_content}")
+# print(answer_content)
 
 多图像输入
 通义千问VL 模型支持在单次请求中传入多张图片，可用于商品对比、多页文档处理等任务。实现时只需在user message 的content数组中包含多个图片对象即可。
@@ -296,37 +315,35 @@ for chunk in response:
 图片数量受模型图文总 Token 上限（即模型的最大输入）的限制，所有图片和文本的总 Token 数必须小于模型的最大输入。
 
 OpenAI兼容DashScope
-PythonJavacurl
+PythonNode.jscurl
  
 import os
-import dashscope
+from openai import OpenAI
 
-# 若使用新加坡地域的模型，请取消下列注释
-# dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
-
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"image": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"},
-            {"image": "https://dashscope.oss-cn-beijing.aliyuncs.com/images/tiger.png"},
-            {"text": "这些图描绘了什么内容?"}
-        ]
-    }
-]
-
-response = dashscope.MultiModalConversation.call(
-    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
+client = OpenAI(
     # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
-    api_key=os.getenv('DASHSCOPE_API_KEY'),
-    model='qwen3-vl-plus', # 此处以qwen3-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
-    messages=messages
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    # 以下为北京地域url，若使用新加坡地域的模型，需将url替换为：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
+completion = client.chat.completions.create(
+    model="qwen3-vl-plus", # 此处以qwen3-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
+    messages=[
+       {"role": "user","content": [
+           {"type": "image_url","image_url": {"url": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"},},
+           {"type": "image_url","image_url": {"url": "https://dashscope.oss-cn-beijing.aliyuncs.com/images/tiger.png"},},
+           {"type": "text", "text": "这些图描绘了什么内容？"},
+            ],
+        }
+    ],
 )
 
-print(response.output.choices[0].message.content[0]["text"])
+print(completion.choices[0].message.content)
 返回结果
  
-这些图片展示了一些动物和自然场景。第一张图片中，一个人和一只狗在海滩上互动。第二张图片是一只老虎在森林中行走
+图1中是一位女士和一只拉布拉多犬在海滩上互动的场景。女士穿着格子衬衫，坐在沙滩上，与狗进行握手的动作，背景是海浪和天空，整个画面充满了温馨和愉快的氛围。
+
+图2中是一只老虎在森林中行走的场景。老虎的毛色是橙色和黑色条纹相间，它正向前迈步，周围是茂密的树木和植被，地面上覆盖着落叶，整个画面给人一种野生自然的感觉。
 视频理解
 通义千问VL模型支持对视频内容进行理解，文件形式包括图像列表（视频帧）或视频文件。
 
@@ -350,32 +367,31 @@ fps
 以下是理解在线视频（通过URL指定）的示例代码。了解如何传入本地文件。
 
 OpenAI兼容DashScope
-PythonJavacurl
+使用OpenAI SDK或HTTP方式向通义千问VL模型直接输入视频文件时，需要将用户消息中的"type"参数设为"video_url"。
+PythonNode.jscurl
  
-import dashscope
 import os
+from openai import OpenAI
 
-# 若使用新加坡地域的模型，请取消下列注释
-# dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
-
-messages = [
-    {"role": "user",
-        "content": [
-            # fps 可参数控制视频抽帧频率，表示每隔 1/fps 秒抽取一帧，完整用法请参见：https://help.aliyun.com/zh/model-studio/use-qwen-by-calling-api?#2ed5ee7377fum
-            {"video": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241115/cqqkru/1.mp4","fps":2},
-            {"text": "这段视频的内容是什么?"}
-        ]
-    }
-]
-
-response = dashscope.MultiModalConversation.call(
-    # 若没有配置环境变量， 请用百炼API Key将下行替换为： api_key ="sk-xxx"
-    api_key=os.getenv('DASHSCOPE_API_KEY'),
-    model='qwen3-vl-plus',
-    messages=messages
+client = OpenAI(
+    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
+    # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    # 以下是北京地域base_url，如果使用新加坡地域的模型，需要将base_url替换为：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
-
-print(response.output.choices[0].message.content[0]["text"])
+completion = client.chat.completions.create(
+    model="qwen3-vl-plus",
+    messages=[
+        {"role": "user","content": [{
+            # 直接传入视频文件时，请将type的值设置为video_url
+            # 使用OpenAI SDK时，视频文件默认每间隔0.5秒抽取一帧，且不支持修改，如需自定义抽帧频率，请使用DashScope SDK.
+            "type": "video_url",            
+            "video_url": {"url": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241115/cqqkru/1.mp4"}},
+            {"type": "text","text": "这段视频的内容是什么?"}]
+         }]
+)
+print(completion.choices[0].message.content)
 传入本地文件（Base64 编码或文件路径）
 通义千问VL 提供两种本地文件上传方式：
 
@@ -434,8 +450,6 @@ Base64编码方式传入时，由于Base64编码会增加数据体积，需保�
 
 如需压缩文件体积请参见如何将图像或视频压缩到满足要求的大小？
 图像视频文件图像列表
-以保存在本地的test.mp4为例。
-
 文件路径传入Base64 编码传入
 传入文件路径仅支持 DashScope Python 和 Java SDK方式调用，不支持 DashScope HTTP 和OpenAI 兼容方式。
 PythonJava
@@ -447,18 +461,18 @@ import dashscope
 # 若使用新加坡地域的模型，请取消下列注释
 # dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
 
-# 将xxxx/test.mp4替换为你本地视频的绝对路径
-local_path = "xxx/test.mp4"
-video_path = f"file://{local_path}"
+# 将xxx/eagle.png替换为你本地图像的绝对路径
+local_path = "xxx/eagle.png"
+image_path = f"file://{local_path}"
 messages = [
                 {'role':'user',
-                # fps参数控制视频抽帧数量，表示每隔1/fps 秒抽取一帧
-                'content': [{'video': video_path,"fps":2},
-                            {'text': '这段视频描绘的是什么景象?'}]}]
+                'content': [{'image': image_path},
+                            {'text': '图中描绘的是什么景象?'}]}]
 response = MultiModalConversation.call(
     # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
+    # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
     api_key=os.getenv('DASHSCOPE_API_KEY'),
-    model='qwen3-vl-plus',  
+    model='qwen3-vl-plus',  # 此处以qwen3-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
     messages=messages)
 print(response.output.choices[0].message.content[0]["text"])
 处理高分辨率图像
@@ -527,39 +541,38 @@ vl_high_resolution_images为false时，可自定义，最大值是12845056
 需要关注一定的细节，可接受较低的处理速度：适当提高 max_pixels 的值
 
 OpenAI 兼容DashScope
-PythonJavacurl
+vl_high_resolution_images非 OpenAI 标准参数，若使用 OpenAI Python SDK 请通过 extra_body传入。
+
+PythonNode.jscurl
  
 import os
-import dashscope
+from openai import OpenAI
 
-# 若使用新加坡地域的模型，请取消下列注释
-# dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+client = OpenAI(
+    # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    # 以下为北京地域url，若使用新加坡地域的模型，需将url替换为：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
 
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {"image": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20250212/earbrt/vcg_VCG211286867973_RF.jpg",
+
+completion = client.chat.completions.create(
+    model="qwen3-vl-plus",
+    messages=[
+        {"role": "user","content": [
+            {"type": "image_url","image_url": {"url": "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20250212/earbrt/vcg_VCG211286867973_RF.jpg"},
             # max_pixels表示输入图像的最大像素阈值，在vl_high_resolution_images=True，无效，vl_high_resolution_images=False，支持自定义，不同模型最大值不同
             # "max_pixels": 16384 * 32 * 32
             },
-            {"text": "这张图表现的是哪个节日的氛围？"}
-        ]
-    }
-]
+           {"type": "text", "text": "这张图表现的是哪个节日的氛围？"},
+            ],
+        }
+    ],
+    extra_body={"vl_high_resolution_images":True}
 
-response = dashscope.MultiModalConversation.call(
-        # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
-        # 新加坡和北京地域的API Key不同。获取API Key：https://help.aliyun.com/zh/model-studio/get-api-key
-        api_key=os.getenv('DASHSCOPE_API_KEY'),
-        model='qwen3-vl-plus',
-        messages=messages,
-        vl_high_resolution_images=True
-    )
-
-
-print("模型输出",response.output.choices[0].message.content[0]["text"])
-print("输入总Tokens：",response.usage.input_tokens)
+)
+print(f"模型输出结果: {completion.choices[0].message.content}")
+print(f"输入总Tokens: {completion.usage.prompt_tokens}")
 更多用法
 多轮对话
 
@@ -676,18 +689,3 @@ Qwen-Long支持处理文本文件，可用于解析文件内容。
 超时处理：在非流式调用中，180秒内模型没有结束输出通常会触发超时报错。为了提升用户体验，超时后响应体中会将已生成的内容返回。如果响应头包含x-dashscope-partialresponse：true，表示本次响应触发了超时。您可以使用前缀续写功能（部分通义千问VL模型支持），将已生成的内容添加到 messages 数组并再次发出请求，使大模型继续生成内容。详情请参见：基于不完整输出进行续写。
 
 重试机制：设计合理的API调用重试逻辑（如指数退避），以应对网络波动或服务瞬时不可用的情况。
-
-计费与限流
-限流：通义千问VL模型的限流条件参见限流。
-
-免费额度（仅北京地域）：从开通百炼或模型申请通过之日起计算有效期，有效期90天内，通义千问VL模型提供100万Token的免费额度。
-
-计费：
-
-总费用 = 输入 Token 数 × 模型输入单价 + 模型输出 Token 数 × 模型输出单价；输入和输出价格可参见模型列表。
-
-思考模式下，思考过程（reasoning_content）会作为输出内容的一部分，计入输出 Token 并产生相应费用。若思考模式下未输出思考过程，按照非思考模式价格计费。
-
-图像与视频转换为Token的规则
-
-查看账单：您可以在阿里云控制台的费用与成本页面查看账单或进行充值。

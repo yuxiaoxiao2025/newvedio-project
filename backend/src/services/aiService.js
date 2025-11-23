@@ -1,4 +1,6 @@
 const axios = require('axios');
+const { spawn } = require('child_process');
+const path = require('path');
 
 /**
  * AI服务 - 双模型协同架构 (全面使用DashScope原生API)
@@ -198,6 +200,121 @@ class AIService {
       console.error('VL模型分析失败:', error);
       throw new Error(`视频分析失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 使用DashScope Python SDK进行本地视频文件分析
+   * 解决HTTP API无法访问本地文件的问题
+   */
+  async analyzeVideoWithSDK(videoPath, analysisType = 'content', extraPrompt = '', videoPath2 = '') {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`开始使用Python SDK分析视频: ${videoPath}`);
+
+        // 构建Python脚本的路径
+        const scriptPath = path.join(__dirname, '..', 'scripts', 'video_analyzer.py');
+
+        // 构建命令参数，传递本地文件路径而非URL
+        // 需要将URL转换为本地文件路径
+        let localVideoPath = videoPath;
+        if (videoPath.startsWith('http://localhost:8005/uploads/')) {
+          // 从URL提取相对路径
+          const urlPath = new URL(videoPath).pathname;
+          localVideoPath = path.join(__dirname, '..', 'upload', urlPath.replace(/^\/uploads\//, ''));
+        }
+
+        const args = [
+          'python',
+          scriptPath,
+          '--video-path', localVideoPath,
+          '--type', analysisType
+        ];
+
+        if (videoPath2) {
+          args.push('--video-path2', videoPath2);
+        }
+
+        if (extraPrompt) {
+          args.push('--prompt', extraPrompt);
+        }
+
+        console.log('执行Python命令:', args.join(' '));
+
+        // 启动Python进程
+        const pythonProcess = spawn('python', args, {
+          cwd: path.join(__dirname, '..'),
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            PYTHONIOENCODING: 'utf-8'
+          }
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        // 收集输出
+        pythonProcess.stdout.on('data', (data) => {
+          stdout += data.toString('utf8');
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+          stderr += data.toString('utf8');
+        });
+
+        // 处理进程结束
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const result = JSON.parse(stdout.trim());
+
+              if (result.success) {
+                console.log('Python SDK分析成功完成');
+                console.log('Token使用情况:', result.usage || '未知');
+                resolve(result.data);
+              } else {
+                console.error('Python SDK分析失败:', result.error);
+                reject(new Error(`Python SDK分析失败: ${result.error}`));
+              }
+            } catch (parseError) {
+              console.error('Python SDK返回结果解析失败:', {
+                stdout: stdout.substring(0, 500),
+                stderr: stderr.substring(0, 500),
+                error: parseError.message
+              });
+              reject(new Error(`Python SDK返回结果解析失败: ${parseError.message}`));
+            }
+          } else {
+            console.error('Python进程异常退出:', {
+              code,
+              stdout: stdout.substring(0, 500),
+              stderr: stderr.substring(0, 500)
+            });
+            reject(new Error(`Python进程异常退出: code=${code}, error=${stderr || '未知错误'}`));
+          }
+        });
+
+        // 处理进程错误
+        pythonProcess.on('error', (error) => {
+          console.error('Python进程启动失败:', error);
+          reject(new Error(`Python进程启动失败: ${error.message}`));
+        });
+
+        // 设置超时
+        const timeout = setTimeout(() => {
+          pythonProcess.kill('SIGTERM');
+          reject(new Error('Python SDK分析超时'));
+        }, 180000); // 3分钟超时
+
+        pythonProcess.on('close', () => {
+          clearTimeout(timeout);
+        });
+
+      } catch (error) {
+        console.error('Python SDK调用过程中发生错误:', error);
+        reject(new Error(`Python SDK调用失败: ${error.message}`));
+      }
+    });
   }
 
   /**
@@ -560,12 +677,20 @@ class AIService {
 
       let vlAnalysis;
       try {
-        vlAnalysis = await this.callWithRetry(() => this.analyzeVideoContent(videoPath));
-      } catch (e) {
-        if (this.isExternalAIError(e)) {
-          vlAnalysis = {};
-        } else {
-          throw e;
+        // 优先使用Python SDK处理本地文件，如果失败则回退到HTTP API
+        console.log('尝试使用Python SDK分析本地视频文件...');
+        vlAnalysis = await this.analyzeVideoWithSDK(videoPath, 'content');
+      } catch (sdkError) {
+        console.warn('Python SDK分析失败，回退到HTTP API:', sdkError.message);
+        try {
+          vlAnalysis = await this.callWithRetry(() => this.analyzeVideoContent(videoPath));
+        } catch (httpError) {
+          if (this.isExternalAIError(httpError)) {
+            console.warn('HTTP API也失败，使用空数据结构:', httpError.message);
+            vlAnalysis = {};
+          } else {
+            throw httpError;
+          }
         }
       }
 
@@ -670,22 +795,40 @@ class AIService {
 
       let video1Analysis;
       let video2Analysis;
+
+      // 分析第一个视频
       try {
-        video1Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video1Path));
-      } catch (e) {
-        if (this.isExternalAIError(e)) {
-          video1Analysis = {};
-        } else {
-          throw e;
+        console.log('尝试使用Python SDK分析第一个视频...');
+        video1Analysis = await this.analyzeVideoWithSDK(video1Path, 'content');
+      } catch (sdkError1) {
+        console.warn('第一个视频Python SDK分析失败，回退到HTTP API:', sdkError1.message);
+        try {
+          video1Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video1Path));
+        } catch (httpError1) {
+          if (this.isExternalAIError(httpError1)) {
+            console.warn('第一个视频HTTP API也失败，使用空数据结构:', httpError1.message);
+            video1Analysis = {};
+          } else {
+            throw httpError1;
+          }
         }
       }
+
+      // 分析第二个视频
       try {
-        video2Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video2Path));
-      } catch (e) {
-        if (this.isExternalAIError(e)) {
-          video2Analysis = {};
-        } else {
-          throw e;
+        console.log('尝试使用Python SDK分析第二个视频...');
+        video2Analysis = await this.analyzeVideoWithSDK(video2Path, 'content');
+      } catch (sdkError2) {
+        console.warn('第二个视频Python SDK分析失败，回退到HTTP API:', sdkError2.message);
+        try {
+          video2Analysis = await this.callWithRetry(() => this.analyzeVideoContent(video2Path));
+        } catch (httpError2) {
+          if (this.isExternalAIError(httpError2)) {
+            console.warn('第二个视频HTTP API也失败，使用空数据结构:', httpError2.message);
+            video2Analysis = {};
+          } else {
+            throw httpError2;
+          }
         }
       }
 
@@ -912,12 +1055,23 @@ class AIService {
   /**
    * 带重试机制的AI服务调用 - 基于Qwen官方推荐的重试机制
    * 遵循官方文档中的指数退避策略：wait_time = 2 ^ attempt
+   * 增强功能: 断路器模式、抖动机制、详细错误分类
    */
-  async callWithRetry(serviceFunction, maxRetries = 3) {
+  async callWithRetry(serviceFunction, options = {}) {
     // 输入验证
     if (typeof serviceFunction !== 'function') {
       throw new Error('serviceFunction must be a function');
     }
+
+    // 配置重试选项
+    const config = {
+      maxRetries: 3,
+      baseDelay: 1000,          // 基础延迟1秒
+      maxDelay: 30000,          // 最大延迟30秒
+      useJitter: true,          // 使用抖动防止雷群效应
+      circuitBreaker: true,     // 启用断路器模式
+      ...options
+    };
 
     // 确保setTimeout在测试环境中可用 - 修复setTimeout undefined错误
     const setTimeout = (() => {
@@ -936,22 +1090,33 @@ class AIService {
       }
     })();
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (let attempt = 0; attempt < config.maxRetries; attempt++) {
       try {
         return await serviceFunction();
       } catch (error) {
         // 最后一次重试失败，抛出错误
-        if (attempt === maxRetries - 1) {
+        if (attempt === config.maxRetries - 1) {
           // 丰富错误信息，保留原始错误的所有属性
-          const enhancedError = new Error(`AI服务调用失败，已重试${maxRetries}次: ${error.message}`);
+          const enhancedError = new Error(`AI服务调用失败，已重试${config.maxRetries}次: ${error.message}`);
           enhancedError.originalError = error;
-          enhancedError.retryCount = maxRetries;
+          enhancedError.retryCount = config.maxRetries;
           enhancedError.code = error.code || 'AI_SERVICE_ERROR';
           enhancedError.status = error.status || 500;
+          enhancedError.attempts = attempt + 1;
           throw enhancedError;
         }
 
-        // 问题8修复: 优化速率限制处理
+        // 断路器模式: 对于非可重试错误，直接失败
+        if (config.circuitBreaker && !this.isExternalAIError(error) && error.status !== 429) {
+          const enhancedError = new Error(`AI服务调用失败，非可重试错误: ${error.message}`);
+          enhancedError.originalError = error;
+          enhancedError.code = error.code || 'NON_RETRYABLE_ERROR';
+          enhancedError.status = error.status || 500;
+          enhancedError.circuitBreakerTripped = true;
+          throw enhancedError;
+        }
+
+        // 计算延迟时间 - 增强版指数退避 + 抖动
         let delay;
         if (error.status === 429) {
           // 处理429速率限制错误
@@ -966,17 +1131,30 @@ class AIService {
             console.warn(`触发AI服务速率限制，将在${delay / 1000}秒后重试`);
           }
         } else {
-          // 其他错误使用标准指数退避
-          delay = process.env.NODE_ENV === 'test' ? 1 : Math.pow(2, attempt) * 1000;
+          // 其他错误使用标准指数退避 + 抖动
+          delay = Math.min(config.baseDelay * Math.pow(2, attempt), config.maxDelay);
+
+          // 添加抖动防止雷群效应 (+/- 25% 随机变化)
+          if (config.useJitter) {
+            const jitterFactor = 0.75 + Math.random() * 0.5; // 0.75-1.25倍随机抖动
+            delay = Math.floor(delay * jitterFactor);
+          }
+
+          // 测试环境加速
+          if (process.env.NODE_ENV === 'test') {
+            delay = Math.min(delay, 100);
+          }
         }
 
         // 记录重试信息
-        console.warn(`AI服务调用失败，重试 ${attempt + 1}/${maxRetries}:`, {
+        console.warn(`AI服务调用失败，重试 ${attempt + 1}/${config.maxRetries}:`, {
           message: error.message,
           code: error.code,
           status: error.status,
           retryAttempt: attempt + 1,
-          delaySeconds: delay / 1000
+          delaySeconds: delay / 1000,
+          hasJitter: config.useJitter,
+          nextRetryIn: new Date(Date.now() + delay).toISOString()
         });
 
         await new Promise(resolve => setTimeout(resolve, delay));

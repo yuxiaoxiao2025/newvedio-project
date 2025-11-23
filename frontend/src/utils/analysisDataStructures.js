@@ -365,9 +365,16 @@ export const validateAnalysisResult = (result, type) => {
 const validateContentAnalysis = (result) => {
   const errors = []
 
-  if (!result.vlAnalysis) errors.push('缺少VL分析结果')
-  if (!result.finalReport) errors.push('缺少最终报告')
-  if (!result.structuredData) errors.push('缺少结构化数据')
+  const top = result || {}
+  const nested = (result && result.result) || {}
+
+  const vl = top.vlAnalysis || nested.vlAnalysis
+  const report = top.finalReport || nested.finalReport
+  const structured = top.structuredData || nested.structuredData
+
+  if (!vl) errors.push('缺少VL分析结果')
+  if (!report) errors.push('缺少最终报告')
+  if (!structured) errors.push('缺少结构化数据')
 
   return {
     valid: errors.length === 0,

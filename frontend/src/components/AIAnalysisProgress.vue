@@ -208,6 +208,10 @@ export default {
     const elapsedTime = ref('')
     const estimatedTimeRemaining = ref('')
     const startTime = ref(props.startTime || Date.now())
+    const lastProgressAt = ref(Date.now())
+    const lastProgress = ref(0)
+    const avgRate = ref(0)
+    const lastRemainingSeconds = ref(null)
 
     // 获取分析图标
     const getAnalysisIcon = () => {
@@ -324,26 +328,38 @@ export default {
           : `${remainingSeconds}秒`
       }
 
-      // 估算剩余时间
       if (percentage.value > 5 && percentage.value < 95) {
-        const estimatedTotal = (elapsed / percentage.value) * 100
-        const remaining = estimatedTotal - elapsed
+        const dt = now - lastProgressAt.value
+        const dp = Math.max(0, percentage.value - lastProgress.value)
+        const instRate = dt > 0 ? dp / (dt / 1000) : 0
+        avgRate.value = avgRate.value > 0 && instRate > 0
+          ? (avgRate.value * 0.7 + instRate * 0.3)
+          : (instRate || avgRate.value)
 
-        if (remaining > 0) {
-          const seconds = Math.floor(remaining / 1000)
-          const minutes = Math.floor(seconds / 60)
-          const remainingSeconds = seconds % 60
+        const rate = avgRate.value
+        if (rate && rate > 0) {
+          const remainingPercent = 100 - percentage.value
+          const calcSeconds = Math.max(0, Math.ceil(remainingPercent / rate))
+          const rs = lastRemainingSeconds.value == null ? calcSeconds : Math.min(lastRemainingSeconds.value, calcSeconds)
+          lastRemainingSeconds.value = rs
+          const minutes = Math.floor(rs / 60)
+          const seconds = rs % 60
           estimatedTimeRemaining.value = minutes > 0
-            ? `约${minutes}分${remainingSeconds}秒`
-            : `约${remainingSeconds}秒`
+            ? `约${minutes}分${seconds}秒`
+            : `约${seconds}秒`
         } else {
-          estimatedTimeRemaining.value = '即将完成'
+          estimatedTimeRemaining.value = ''
         }
       }
     }
 
     // 监听进度变化
     watch(() => props.progress, (newProgress) => {
+      const now = Date.now()
+      if (newProgress >= lastProgress.value) {
+        lastProgressAt.value = now
+        lastProgress.value = newProgress
+      }
       updateStages()
 
       // 添加阶段性日志
@@ -366,11 +382,14 @@ export default {
       if (newStatus === 'completed') {
         addLog('分析任务完成', 'success')
         emit('complete')
+        lastRemainingSeconds.value = null
       } else if (newStatus === 'failed') {
         addLog('分析任务失败', 'error')
         emit('failed')
+        lastRemainingSeconds.value = null
       } else if (newStatus === 'cancelled') {
         addLog('分析任务已取消', 'warning')
+        lastRemainingSeconds.value = null
       }
     })
 

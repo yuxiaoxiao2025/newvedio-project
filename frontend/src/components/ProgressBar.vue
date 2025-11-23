@@ -49,9 +49,9 @@
           <span class="detail-label">上传速度:</span>
           <span class="detail-value">{{ formatSpeed(progress.currentFile.uploadSpeed) }}</span>
         </div>
-        <div v-if="progress.estimatedTimeRemaining > 0" class="detail-item">
+        <div v-if="estimatedTimeRemaining > 0" class="detail-item">
           <span class="detail-label">预计剩余:</span>
-          <span class="detail-value">{{ formatTime(progress.estimatedTimeRemaining) }}</span>
+          <span class="detail-value">{{ formatTime(estimatedTimeRemaining) }}</span>
         </div>
       </div>
 
@@ -185,7 +185,7 @@ export default {
 
       pollInterval = setInterval(async () => {
         try {
-          const response = await fetch(`/api/upload/progress/${props.sessionId}`)
+          const response = await fetch(`${API_BASE}/api/upload/progress/${props.sessionId}`)
           if (response.ok) {
             const data = await response.json()
 
@@ -347,7 +347,7 @@ export default {
     // 处理取消
     const handleCancel = async () => {
       try {
-        const response = await fetch(`/api/upload/cancel/${props.sessionId}`, {
+        const response = await fetch(`${API_BASE}/api/upload/cancel/${props.sessionId}`, {
           method: 'POST'
         })
 
@@ -436,6 +436,17 @@ export default {
       return `${minutes}分${remainingSeconds}秒`
     }
 
+    const estimatedTimeRemaining = computed(() => {
+      const cf = progress.value.currentFile
+      if (!cf || !cf.uploadSpeed || !cf.progress) return 0
+      const meta = files.value.find(f => f.originalName === cf.originalName)
+      const size = meta?.fileSize
+      if (!size || cf.uploadSpeed <= 0) return 0
+      const remainingBytes = Math.round(size * (100 - cf.progress) / 100)
+      const seconds = Math.round(remainingBytes / cf.uploadSpeed)
+      return seconds > 0 ? seconds : 0
+    })
+
     const isFailed = computed(() => {
       return progress.value.overallStatus === 'failed' ||
              files.value.some(file => file.status === 'failed')
@@ -472,6 +483,7 @@ export default {
       formatFileSize,
       formatSpeed,
       formatTime,
+      estimatedTimeRemaining,
       getStatusText,
       // 新增的UI辅助函数
       getProgressIcon,
@@ -1168,3 +1180,4 @@ export default {
   background-color: #e6f7ff;
 }
 </style>
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8005'

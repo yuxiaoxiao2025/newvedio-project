@@ -81,6 +81,7 @@ export default {
   name: 'FileUploader',
   emits: ['files-selected', 'upload-complete'],
   setup(props, { emit }) {
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8005'
     // 状态
     const fileInput = ref(null)
     const files = ref([])
@@ -220,7 +221,7 @@ export default {
           }))
         }
 
-        const response = await fetch('/api/upload/validate', {
+        const response = await fetch(`${API_BASE}/api/upload/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(validationData)

@@ -94,15 +94,7 @@ class RealtimeUploadMiddleware {
     const multerInstance = this.createMulterInstance();
 
     return (req, res, next) => {
-      const sessionId = req.body.sessionId;
-
-      if (!sessionId) {
-        return res.status(400).json({
-          error: 'NO_SESSION_ID',
-          message: '缺少会话ID',
-          timestamp: new Date().toISOString()
-        });
-      }
+      let sessionId = null;
 
       // 监听请求进度（使用原生方式）
       let totalSize = 0;
@@ -139,6 +131,16 @@ class RealtimeUploadMiddleware {
 
       // 处理文件上传前的准备工作
       const prepareUpload = (req, res, next) => {
+        sessionId = req.body.sessionId;
+
+        if (!sessionId) {
+          return res.status(400).json({
+            error: 'NO_SESSION_ID',
+            message: '缺少会话ID',
+            timestamp: new Date().toISOString()
+          });
+        }
+
         // 获取Content-Length来计算总大小
         const contentLength = parseInt(req.headers['content-length'] || '0');
 
@@ -179,7 +181,7 @@ class RealtimeUploadMiddleware {
       let isDataListening = false;
 
       const setupProgressTracking = () => {
-        if (isDataListening || !req.files || req.files.length === 0) return;
+        if (isDataListening || !req.files || req.files.length === 0 || !sessionId) return;
 
         isDataListening = true;
         let lastProgressEmit = 0;

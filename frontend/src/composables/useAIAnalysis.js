@@ -96,10 +96,13 @@ export function useAIAnalysis() {
         const result = await response.json()
         analysisResult.value = result.data
 
-        // 自动保存分析结果
         try {
           const saveData = {
-            ...result.data,
+            result: {
+              vlAnalysis: result.data.rawAnalysis,
+              finalReport: result.data.finalReport,
+              structuredData: result.data.structuredData
+            },
             inputs: {
               videoPath: videoData.path,
               category: videoData.category,
@@ -111,7 +114,6 @@ export function useAIAnalysis() {
           await saveAnalysisResult(saveData, 'content')
         } catch (saveError) {
           console.warn('保存分析结果失败:', saveError)
-          // 不阻塞主流程
         }
 
         return result.data

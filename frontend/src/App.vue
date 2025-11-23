@@ -220,6 +220,8 @@ export default {
     const isGeneratingMusic = ref(false)
     const analysisStartTime = ref(null)
 
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8005'
+
     // 使用AI分析composable
     const {
       isAnalyzing,
@@ -247,7 +249,7 @@ export default {
 
       try {
         // 创建上传会话
-        const response = await fetch('/api/upload/session', {
+        const response = await fetch(`${API_BASE}/api/upload/session`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -290,7 +292,7 @@ export default {
           formData.append('sessionId', data.sessionId)
           formData.append('category', category)
 
-          const uploadResponse = await fetch('/api/upload/batch', {
+          const uploadResponse = await fetch(`${API_BASE}/api/upload/batch`, {
             method: 'POST',
             body: formData
           })
@@ -697,3 +699,4 @@ export default {
   }
 }
 </style>
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8005'

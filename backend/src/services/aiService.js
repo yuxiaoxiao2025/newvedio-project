@@ -223,8 +223,9 @@ class AIService {
           localVideoPath = path.join(__dirname, '..', 'upload', urlPath.replace(/^\/uploads\//, ''));
         }
 
+        const venvPython = path.join(__dirname, '..', '..', '..', '.venv', 'Scripts', 'python.exe');
+        const pythonExe = venvPython;
         const args = [
-          'python',
           scriptPath,
           '--video-path', localVideoPath,
           '--type', analysisType
@@ -241,7 +242,7 @@ class AIService {
         console.log('执行Python命令:', args.join(' '));
 
         // 启动Python进程
-        const pythonProcess = spawn('python', args, {
+        const pythonProcess = spawn(pythonExe, args, {
           cwd: path.join(__dirname, '..'),
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
@@ -680,6 +681,12 @@ class AIService {
         // 优先使用Python SDK处理本地文件，如果失败则回退到HTTP API
         console.log('尝试使用Python SDK分析本地视频文件...');
         vlAnalysis = await this.analyzeVideoWithSDK(videoPath, 'content');
+        if (vlAnalysis && typeof vlAnalysis === 'object') {
+          const hasWrapped = 'rawAnalysis' in vlAnalysis || 'finalReport' in vlAnalysis || 'structuredData' in vlAnalysis;
+          if (hasWrapped) {
+            vlAnalysis = vlAnalysis.rawAnalysis || vlAnalysis;
+          }
+        }
       } catch (sdkError) {
         console.warn('Python SDK分析失败，回退到HTTP API:', sdkError.message);
         try {
@@ -800,6 +807,12 @@ class AIService {
       try {
         console.log('尝试使用Python SDK分析第一个视频...');
         video1Analysis = await this.analyzeVideoWithSDK(video1Path, 'content');
+        if (video1Analysis && typeof video1Analysis === 'object') {
+          const hasWrapped1 = 'rawAnalysis' in video1Analysis || 'finalReport' in video1Analysis || 'structuredData' in video1Analysis;
+          if (hasWrapped1) {
+            video1Analysis = video1Analysis.rawAnalysis || video1Analysis;
+          }
+        }
       } catch (sdkError1) {
         console.warn('第一个视频Python SDK分析失败，回退到HTTP API:', sdkError1.message);
         try {
@@ -818,6 +831,12 @@ class AIService {
       try {
         console.log('尝试使用Python SDK分析第二个视频...');
         video2Analysis = await this.analyzeVideoWithSDK(video2Path, 'content');
+        if (video2Analysis && typeof video2Analysis === 'object') {
+          const hasWrapped2 = 'rawAnalysis' in video2Analysis || 'finalReport' in video2Analysis || 'structuredData' in video2Analysis;
+          if (hasWrapped2) {
+            video2Analysis = video2Analysis.rawAnalysis || video2Analysis;
+          }
+        }
       } catch (sdkError2) {
         console.warn('第二个视频Python SDK分析失败，回退到HTTP API:', sdkError2.message);
         try {

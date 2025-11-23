@@ -195,3 +195,224 @@ Two-level logging system:
 - **Developer Logs**: Technical debugging and system monitoring logs
 
 Both levels must be implemented for comprehensive debugging and issue resolution.
+
+## Environment Setup
+
+### System Requirements
+
+- **Node.js**: >= 16.0.0 (LTS recommended)
+- **npm**: >= 8.0.0 or **cnpm**: >= 7.0.0 (required)
+- **Operating System**: Windows 10+, macOS 10.15+, Ubuntu 18.04+
+- **Memory**: Minimum 4GB RAM (8GB recommended for video processing)
+- **Storage**: 5GB free space for development and testing
+
+### Environment Variables
+
+Create `.env` files in both backend and frontend directories:
+
+**Backend `.env`:**
+```env
+PORT=8005
+NODE_ENV=development
+UPLOAD_DIR=./upload
+MAX_FILE_SIZE=314572800
+ALLOWED_FILE_TYPES=mp4,avi
+RATE_LIMIT_WINDOW=900000
+RATE_LIMIT_MAX=100
+JWT_SECRET=your-jwt-secret-here
+CORS_ORIGIN=http://localhost:3005
+```
+
+**Frontend `.env`:**
+```env
+VITE_API_BASE_URL=http://localhost:3005
+VITE_WS_URL=ws://localhost:8005
+VITE_MAX_FILE_SIZE=314572800
+VITE_ALLOWED_FILE_TYPES=mp4,avi
+```
+
+### Initial Setup Sequence
+
+```bash
+# 1. Clone and navigate to project
+git clone <repository-url>
+cd newvedio-project
+
+# 2. Install global dependencies (cnpm required)
+npm install -g cnpm
+
+# 3. Backend setup
+cd backend
+cnpm install
+cp .env.example .env  # Edit with your values
+
+# 4. Frontend setup
+cd ../frontend
+cnpm install
+cp .env.example .env  # Edit with your values
+
+# 5. Create upload directories
+cd ../backend
+mkdir -p upload/personal upload/scenic
+
+# 6. Start development servers
+# Terminal 1 - Backend:
+npm start
+
+# Terminal 2 - Frontend:
+cd ../frontend
+npm run dev
+```
+
+## API Documentation
+
+### Core Endpoints
+
+- **API Documentation**: `backend/API.md` - Complete API reference
+- **API Details**: `backend/API_DOCS.md` - Detailed implementation notes
+- **WebSocket Contract**: `specs/001-responsive-h5-upload/contracts/websocket.md`
+
+### Key API Endpoints
+
+```bash
+# File upload
+POST /api/upload
+Content-Type: multipart/form-data
+
+# Upload progress via WebSocket
+WS: /socket.io
+Events: upload-progress, upload-complete, upload-error
+
+# File validation
+GET /api/validate/file-info
+Query: filename, size
+```
+
+## Testing Guide
+
+### Test Structure
+
+```
+tests/
+├── unit/                   # Unit tests for individual components
+├── integration/            # Integration tests for component interactions
+├── e2e/                   # End-to-end tests with real browser
+├── fixtures/              # Test data generation utilities
+└── setup.js              # Test environment configuration
+```
+
+### Chrome DevTools MCP Testing
+
+The project uses Chrome DevTools MCP for visual E2E testing:
+
+**Setup:**
+```bash
+# Ensure MCP Chrome DevTools server is running
+# Use test videos from test-videos/ directory
+```
+
+**Test Scenarios:**
+- File upload flow (valid files)
+- Error handling (invalid formats, oversized files)
+- Progress tracking and cancellation
+- Responsive design on mobile viewports
+- WebSocket connection stability
+
+**Test Data:**
+- Use real video files from `test-videos/` directory
+- Test various file sizes (small, medium, near 300MB limit)
+- Test both mp4 and avi formats
+
+### Running Tests
+
+```bash
+# Frontend tests
+cd frontend
+npm run test              # Unit tests
+npm run test:ui           # Visual test runner
+npm run test:e2e          # Playwright E2E tests
+
+# Backend tests
+cd backend
+npm test                  # Jest tests
+npm run test:coverage     # Coverage report
+```
+
+## Deployment
+
+### Development Environment
+
+```bash
+# Start both services simultaneously
+# Use the provided start scripts or run manually:
+
+cd backend && npm start &
+cd frontend && npm run dev &
+```
+
+### Production Deployment Considerations
+
+- **Process Manager**: Use PM2 or similar for Node.js processes
+- **Reverse Proxy**: Nginx recommended for static file serving
+- **File Storage**: Consider cloud storage for uploaded files
+- **Monitoring**: Implement health checks and logging
+- **Security**: Enable HTTPS, configure CORS properly
+- **Scaling**: Load balancer for multiple backend instances
+
+### Health Checks
+
+```bash
+# Backend health
+curl http://localhost:8005/health
+
+# Frontend availability
+curl http://localhost:3005
+
+# WebSocket connectivity
+wscat -c ws://localhost:8005/socket.io
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Port Conflicts:**
+```bash
+# Check ports 3005 and 8005
+netstat -ano | findstr :3005
+netstat -ano | findstr :8005
+
+# Kill conflicting processes (Windows)
+taskkill /PID <process_id> /F
+```
+
+**File Upload Issues:**
+- Check file size limits (300MB max)
+- Verify mp4/avi format validation
+- Ensure upload directories exist and have write permissions
+- Check WebSocket connection for progress tracking
+
+**Dependency Issues:**
+- Always use `cnpm` instead of `npm`
+- Clear node_modules and reinstall if needed
+- Check Node.js version compatibility
+
+**Performance Issues:**
+- Monitor memory usage during large file uploads
+- Check network bandwidth for upload speeds
+- Verify concurrent upload limits
+
+### Debug Mode
+
+Enable detailed logging by setting:
+```env
+NODE_ENV=development
+DEBUG=video-upload:*
+```
+
+### Log Locations
+
+- **Backend Logs`: `backend/logs/` directory
+- **Frontend Logs`: Browser DevTools Console
+- **Upload Logs`: `backend/logs/upload.log`
+- **Error Logs`: `backend/logs/error.log`

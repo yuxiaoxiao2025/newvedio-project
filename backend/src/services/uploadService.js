@@ -174,19 +174,32 @@ class UploadService {
       });
 
       try {
-        // Simulate progress updates
-        const progressSteps = [10, 25, 50, 75, 90, 100];
+        // 实际文件移动和进度模拟
+        const fileName = config.generateFileName(sessionId, file.originalname);
+        const targetPath = path.join(targetDir, fileName);
+
+        // 先移动文件
+        await fs.move(file.path, targetPath);
+
+        // 模拟上传进度（更平滑的进度条）
+        const progressSteps = [5, 15, 30, 45, 60, 75, 85, 95, 100];
+        const stepDelay = 300; // 每步间隔300ms
 
         for (const progress of progressSteps) {
-          await new Promise(resolve => setTimeout(resolve, 200)); // Simulate upload time
+          await new Promise(resolve => setTimeout(resolve, stepDelay));
 
           fileInfo.progress = progress;
           fileInfo.uploadSpeed = file.size / 1000; // Mock speed
 
-          // Emit progress update
+          // 计算总体进度
+          const completedFilesProgress = result.completedFiles * (100 / files.length);
+          const currentFileProgress = (progress / 100) * (100 / files.length);
+          const totalProgress = Math.round(completedFilesProgress + currentFileProgress);
+
+          // 发送进度更新
           this.emitProgress(sessionId, {
             overallStatus: 'uploading',
-            totalProgress: Math.round(((i + progress / 100) / files.length) * 100),
+            totalProgress,
             completedFiles: result.completedFiles,
             failedFiles: result.failedFiles,
             currentFile: {
@@ -195,16 +208,10 @@ class UploadService {
               progress,
               status: 'uploading',
               uploadSpeed: fileInfo.uploadSpeed
-            }
+            },
+            message: `正在上传 ${file.originalname}... ${progress}%`
           });
         }
-
-        // Generate unique filename
-        const fileName = config.generateFileName(sessionId, file.originalname);
-        const targetPath = path.join(targetDir, fileName);
-
-        // Move file from temp to target directory
-        await fs.move(file.path, targetPath);
 
         // Complete file info
         fileInfo.fileName = fileName;

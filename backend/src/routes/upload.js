@@ -8,6 +8,7 @@ const router = express.Router();
 // Import middleware and controllers
 const uploadController = require('../controllers/uploadController');
 const uploadMiddleware = require('../middleware/upload');
+const { uploadWithProgress, getProgress, cancelUpload, setIO } = require('../middleware/realtimeUpload');
 const authMiddleware = require('../middleware/auth');
 
 // File validation middleware
@@ -48,15 +49,47 @@ router.post('/validate', uploadController.validateFiles);
 router.post('/session', uploadController.createSession);
 
 router.post('/batch',
-  uploadMiddleware.array,
+  uploadWithProgress(), // 使用新的实时进度上传中间件
   validateFiles,
   uploadController.uploadFiles
 );
 
-router.get('/progress/:sessionId', uploadController.getProgress);
+router.get('/progress/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const progress = getProgress(sessionId);
 
-router.post('/cancel/:sessionId', uploadController.cancelUpload);
+  if (!progress) {
+    return res.status(404).json({
+      error: 'SESSION_NOT_FOUND',
+      message: '上传会话不存在',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  res.json(progress);
+});
+
+router.post('/cancel/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const success = cancelUpload(sessionId);
+
+  if (success) {
+    res.json({
+      success: true,
+      message: '上传已取消',
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    res.status(404).json({
+      error: 'SESSION_NOT_FOUND',
+      message: '上传会话不存在或已完成',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 router.delete('/file/:fileId', authMiddleware.requireAuth, uploadController.deleteFile);
 
+// 导出设置IO的方法供app.js使用
 module.exports = router;
+module.exports.setIO = setIO;

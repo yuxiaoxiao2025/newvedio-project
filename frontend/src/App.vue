@@ -263,9 +263,9 @@ export default {
         if (response.ok) {
           sessionId.value = data.sessionId
 
-          // 初始化上传文件数据
+          // 立即初始化上传文件数据，确保进度条组件有数据可显示
           uploadFiles.value = selectedFiles.value.map((file, index) => ({
-            id: index,
+            id: `file-${index}-${Date.now()}`,
             originalName: file.name,
             fileSize: file.size,
             fileType: file.name.toLowerCase().split('.').pop(),
@@ -273,8 +273,14 @@ export default {
             status: 'queued'
           }))
 
-          // 等待足够时间确保WebSocket连接建立
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          console.log('开始上传文件，进度条组件应该已显示', {
+            sessionId: sessionId.value,
+            filesCount: selectedFiles.value.length,
+            step: currentStep.value
+          })
+
+          // 短暂等待确保进度条组件渲染完成
+          await new Promise(resolve => setTimeout(resolve, 500))
 
           // 开始上传
           const formData = new FormData()
@@ -298,8 +304,6 @@ export default {
 
             // 检查是否所有文件都上传成功
             if (uploadData.summary?.failedFiles === 0) {
-              // 不要立即跳转，让用户看到进度条完成
-              // 进度条组件会在WebSocket收到完成信号后自动触发跳转
               console.log('所有文件上传成功，等待进度条确认完成')
 
               // 保存上传成功的文件数据，用于AI分析
@@ -311,6 +315,13 @@ export default {
                 category: category,
                 sessionId: sessionId.value
               }))
+
+              // 延迟跳转，确保用户能看到完成状态
+              setTimeout(() => {
+                if (currentStep.value === 'uploading') {
+                  currentStep.value = 'completed'
+                }
+              }, 2000)
             } else {
               // 如果有失败文件，稍后跳转到完成页面显示结果
               setTimeout(() => {
@@ -335,6 +346,7 @@ export default {
           throw new Error(data.message || '创建会话失败')
         }
       } catch (error) {
+        console.error('上传过程中发生错误:', error)
         currentError.value = {
           code: 'UPLOAD_ERROR',
           message: error.message,

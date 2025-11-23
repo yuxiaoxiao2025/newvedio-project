@@ -85,8 +85,13 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/upload', require('./routes/upload'));
+const uploadRoutes = require('./routes/upload');
+app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', require('./routes/ai'));
+
+// Initialize real-time upload progress tracking with Socket.IO
+const { setIO } = require('./middleware/realtimeUpload');
+setIO(io);
 
 // Multer error handling middleware
 const { handleMulterError } = require('./middleware/upload');

@@ -42,19 +42,24 @@ export function useAIAnalysis() {
       const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
       // 问题12修复: 加入WebSocket会话并监听真实进度
-      const socket = joinSession(analysisId)
-      
+      let socket = null;
+      try {
+        socket = await joinSession(analysisId)
+      } catch (wsError) {
+        console.warn('WebSocket连接失败，使用HTTP轮询模式:', wsError)
+      }
+
       // 监听服务器推送的真实进度
       const progressHandler = (data) => {
         analysisProgress.value = data.progress
         console.log(`分析进度: ${data.progress}% - ${data.message}`)
       }
-      
+
       const errorHandler = (data) => {
         error.value = data.message
       }
-      
-      if (socket) {
+
+      if (socket && typeof socket.on === 'function') {
         socket.on('analysis:progress', progressHandler)
         socket.on('analysis:error', errorHandler)
       }
@@ -150,19 +155,24 @@ export function useAIAnalysis() {
       const fusionId = `fusion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
       // 问题12修复: 加入WebSocket会话并监听真实进度
-      const socket = joinSession(fusionId)
-      
+      let socket = null;
+      try {
+        socket = await joinSession(fusionId)
+      } catch (wsError) {
+        console.warn('WebSocket连接失败，使用HTTP轮询模式:', wsError)
+      }
+
       // 监听服务器推送的真实进度
       const progressHandler = (data) => {
         analysisProgress.value = data.progress
         console.log(`融合分析进度: ${data.progress}% - ${data.message}`)
       }
-      
+
       const errorHandler = (data) => {
         error.value = data.message
       }
-      
-      if (socket) {
+
+      if (socket && typeof socket.on === 'function') {
         socket.on('analysis:progress', progressHandler)
         socket.on('analysis:error', errorHandler)
       }

@@ -4,13 +4,15 @@ import { io } from 'socket.io-client'
 export function useWebSocket(sessionId) {
   const socket = ref(null)
   const connected = ref(false)
+  const connectionPromise = ref(null)
   const progress = ref({
     overallStatus: 'pending',
     totalProgress: 0,
     completedFiles: 0,
     failedFiles: 0,
     currentFile: null,
-    message: ''
+    message: '',
+    sessionId: sessionId
   })
 
   // Progress events
@@ -18,106 +20,176 @@ export function useWebSocket(sessionId) {
   const onCompleted = ref(null)
   const onError = ref(null)
 
-  // Connect to WebSocket
+  // Connect to WebSocket with Promise for better control
   const connect = () => {
-    if (!socket.value) {
-      socket.value = io('http://localhost:8005', {
+    if (connectionPromise.value) {
+      return connectionPromise.value
+    }
+
+    connectionPromise.value = new Promise((resolve, reject) => {
+      if (socket.value && socket.value.connected) {
+        connected.value = true
+        resolve(socket.value)
+        return
+      }
+
+      socket.value = io(`http://localhost:8005`, {
         transports: ['websocket', 'polling'],
         forceNew: true,
-        timeout: 5000,
+        timeout: 8000,
         reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 1000
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 2000
       })
-    }
 
-    socket.value.on('connect', () => {
-      connected.value = true
-    })
-
-    socket.value.on('disconnect', () => {
-      connected.value = false
-    })
-
-    socket.value.on('upload-progress', (data) => {
-      console.log('WebSocket progress update received:', data)
-
-      progress.value = {
-        ...progress.value,
-        ...data
-      }
-
-      // Update files array with current file progress
-      if (data.currentFile) {
-        progress.value.currentFile = data.currentFile
-        console.log('Current file progress updated:', data.currentFile)
-      }
-
-      // Emit progress event
-      if (onProgress.value) {
-        onProgress.value(data)
-      }
-
-      // Check if upload is completed
-      if (data.overallStatus === 'completed') {
-        console.log('Upload completed via WebSocket')
-        if (onCompleted.value) {
-          onCompleted.value(data)
+      const connectTimeout = setTimeout(() => {
+        if (!connected.value) {
+          connected.value = false
+          progress.value.message = 'WebSocket连接超时，将使用HTTP轮询'
+          progress.value.totalProgress = 5
+          reject(new Error('WebSocket connection timeout'))
         }
-        disconnect()
-      }
+      }, 8000)
+
+      socket.value.on('connect', () => {
+        clearTimeout(connectTimeout)
+        connected.value = true
+        console.log('WebSocket connected successfully')
+        progress.value.message = 'WebSocket已连接，准备接收进度更新'
+        resolve(socket.value)
+      })
+
+      socket.value.on('disconnect', (reason) => {
+        connected.value = false
+        console.log('WebSocket disconnected:', reason)
+        if (reason === 'io server disconnect') {
+          // 服务器主动断开，需要重新连接
+          progress.value.message = '与服务器的连接断开，尝试重新连接...'
+          socket.value.connect()
+        }
+      })
+
+      socket.value.on('connect_error', (error) => {
+        clearTimeout(connectTimeout)
+        connected.value = false
+        console.error('WebSocket connection error:', error)
+        progress.value.message = 'WebSocket连接失败，将使用HTTP轮询模式'
+        progress.value.totalProgress = 5
+        reject(error)
+      })
+
+      socket.value.on('reconnect', (attemptNumber) => {
+        console.log('WebSocket reconnected after', attemptNumber, 'attempts')
+        connected.value = true
+        progress.value.message = 'WebSocket已重新连接'
+      })
+
+      socket.value.on('reconnect_error', (error) => {
+        console.error('WebSocket reconnection error:', error)
+        progress.value.message = 'WebSocket重连失败，继续尝试...'
+      })
+
+      socket.value.on('upload-progress', (data) => {
+        console.log('WebSocket progress update received:', data)
+
+        progress.value = {
+          ...progress.value,
+          ...data
+        }
+
+        // Update files array with current file progress
+        if (data.currentFile) {
+          progress.value.currentFile = data.currentFile
+          console.log('Current file progress updated:', data.currentFile)
+        }
+
+        // Emit progress event
+        if (onProgress.value) {
+          onProgress.value(data)
+        }
+
+        // Check if upload is completed
+        if (data.overallStatus === 'completed') {
+          console.log('Upload completed via WebSocket')
+          progress.value.message = '文件上传完成！'
+          if (onCompleted.value) {
+            onCompleted.value(data)
+          }
+          // 延迟断开连接，给用户时间看到完成状态
+          setTimeout(() => {
+            disconnect()
+          }, 3000)
+        }
+      })
+
+      socket.value.on('error', (error) => {
+        console.error('WebSocket error:', error)
+        if (onError.value) {
+          onError.value(error)
+        }
+      })
     })
 
-    socket.value.on('error', (error) => {
-      connected.value = false
-      if (onError.value) {
-        onError.value(error)
-      }
-    })
-
-    socket.value.on('connect_error', (error) => {
-      connected.value = false
-      progress.value.message = 'WebSocket连接失败，使用HTTP轮询模式'
-      progress.value.totalProgress = 10
-    })
-
-    // 设置连接超时
-    setTimeout(() => {
-      if (!connected.value && progress.value.totalProgress === 0) {
-        progress.value.message = '连接超时，切换到HTTP轮询模式'
-        progress.value.totalProgress = 10
-      }
-    }, 3000)
+    return connectionPromise.value
   }
 
-  const joinSession = (sid) => {
-    connect()
-    if (socket.value && sid) {
-      socket.value.emit('join-session', sid)
+  const joinSession = async (sid) => {
+    try {
+      const sock = await connect()
+      if (sock && sid) {
+        sock.emit('join-session', sid)
+        console.log('Joined session:', sid)
+        progress.value.message = '已加入上传会话，等待开始上传...'
+      }
+      return sock
+    } catch (error) {
+      console.error('Failed to join session:', error)
+      progress.value.message = '加入会话失败，将使用HTTP轮询'
+      return null
     }
-    return socket.value
   }
 
   const leaveSession = (sid) => {
     if (socket.value && sid) {
       socket.value.emit('leave-session', sid)
+      console.log('Left session:', sid)
     }
   }
 
   // Disconnect from WebSocket
   const disconnect = () => {
-    if (socket.value && sessionId) {
-      socket.value.emit('leave-session', sessionId)
+    if (socket.value) {
+      if (sessionId) {
+        socket.value.emit('leave-session', sessionId)
+      }
       socket.value.disconnect()
       socket.value = null
-      connected.value = false
+    }
+    connected.value = false
+    connectionPromise.value = null
+    console.log('WebSocket disconnected')
+  }
+
+  // 确保连接并加入会话的便捷方法
+  const ensureConnection = async () => {
+    if (!connected.value && sessionId) {
+      try {
+        await joinSession(sessionId)
+      } catch (error) {
+        console.error('Failed to ensure WebSocket connection:', error)
+        // 不抛出错误，允许继续使用HTTP轮询
+      }
     }
   }
 
   // Auto connect on mount
   onMounted(() => {
     if (sessionId) {
-      connect()
+      // 延迟连接，确保组件完全挂载
+      setTimeout(() => {
+        joinSession(sessionId)
+      }, 200)
     }
   })
 
@@ -136,6 +208,7 @@ export function useWebSocket(sessionId) {
     connect,
     disconnect,
     joinSession,
-    leaveSession
+    leaveSession,
+    ensureConnection // 新增的方法，确保连接可用
   }
 }

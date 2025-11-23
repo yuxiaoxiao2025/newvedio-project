@@ -228,9 +228,47 @@ export default {
   setup(props) {
     const activeTab = ref('overview')
 
-    const summary = computed(() => props.analysis.summary || {})
-    const keyframes = computed(() => props.analysis.keyframes || [])
-    const scenes = computed(() => props.analysis.scenes || [])
+    const summary = computed(() => {
+      const summaryData = props.analysis.summary || {}
+
+      // 添加数据验证和调试日志
+      console.log('🔍 ContentAnalysis接收到的summary:', summaryData)
+
+      // 验证关键字段
+      if (summaryData.duration === undefined || summaryData.duration === null) {
+        console.warn('⚠️ duration字段缺失或为null', { summary: summaryData })
+      }
+
+      if (typeof summaryData.duration !== 'number' || summaryData.duration < 0) {
+        console.warn('⚠️ duration字段类型或值异常', {
+          duration: summaryData.duration,
+          type: typeof summaryData.duration
+        })
+      }
+
+      // 验证其他统计字段
+      const numericFields = ['keyframeCount', 'sceneCount', 'objectCount', 'actionCount']
+      numericFields.forEach(field => {
+        const value = summaryData[field]
+        if (value !== undefined && (typeof value !== 'number' || value < 0)) {
+          console.warn(`⚠️ ${field}字段异常`, { value, type: typeof value })
+        }
+      })
+
+      return summaryData
+    })
+
+    const keyframes = computed(() => {
+      const keyframesData = props.analysis.keyframes || []
+      console.log('🔍 keyframes数据:', { count: keyframesData.length, data: keyframesData.slice(0, 2) })
+      return keyframesData
+    })
+
+    const scenes = computed(() => {
+      const scenesData = props.analysis.scenes || []
+      console.log('🔍 scenes数据:', { count: scenesData.length, data: scenesData.slice(0, 2) })
+      return scenesData
+    })
 
     const reportTabs = [
       { key: 'overview', label: '总览' },
@@ -240,14 +278,28 @@ export default {
 
     // 格式化时间
     const formatDuration = (seconds) => {
-      if (!seconds) return '未知'
+      // 精确检查null和undefined，0秒是有效值
+      if (seconds === null || seconds === undefined) return '未知'
+      if (typeof seconds !== 'number' || seconds < 0) return '数据异常'
+
+      // 特殊处理0秒情况
+      if (seconds === 0) return '0秒'
+
       const minutes = Math.floor(seconds / 60)
       const remainingSeconds = Math.floor(seconds % 60)
+
+      // 优化显示格式
+      if (minutes === 0) {
+        return `${remainingSeconds}秒`
+      }
       return `${minutes}分${remainingSeconds}秒`
     }
 
     const formatTime = (seconds) => {
-      if (!seconds) return '0:00'
+      // 精确检查null和undefined
+      if (seconds === null || seconds === undefined) return '未知'
+      if (typeof seconds !== 'number' || seconds < 0) return '异常'
+
       const minutes = Math.floor(seconds / 60)
       const remainingSeconds = Math.floor(seconds % 60)
       return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`

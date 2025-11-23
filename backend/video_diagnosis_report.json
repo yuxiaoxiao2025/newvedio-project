@@ -1,0 +1,273 @@
+{
+  "directory_path": "E:\\trae\\newvedio-project\\test-videos",
+  "exists": true,
+  "total_files": 10,
+  "video_files": 9,
+  "successful_analyses": 9,
+  "failed_analyses": 0,
+  "files": [
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\invalid_file.txt",
+      "file_name": "invalid_file.txt",
+      "exists": true,
+      "file_size_bytes": 68,
+      "file_size_mb": 0.0,
+      "file_extension": ".txt",
+      "is_video": false,
+      "error": "不是视频文件格式"
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\test010.mp4",
+      "file_name": "test010.mp4",
+      "exists": true,
+      "file_size_bytes": 18208633,
+      "file_size_mb": 17.37,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 12.91,
+        "frameRate": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "frames": 387,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 18208633,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 12.91
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\video_v1_compressed.mp4",
+      "file_name": "video_v1_compressed.mp4",
+      "exists": true,
+      "file_size_bytes": 25366693,
+      "file_size_mb": 24.19,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 123.07,
+        "frameRate": 29.97002997002997,
+        "width": 1920,
+        "height": 1080,
+        "frames": 3688,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 25366693,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 123.07
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\景区测试视频02.mp4",
+      "file_name": "景区测试视频02.mp4",
+      "exists": true,
+      "file_size_bytes": 2006534,
+      "file_size_mb": 1.91,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 16.03,
+        "frameRate": 30.0,
+        "width": 720,
+        "height": 1280,
+        "frames": 481,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 2006534,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 16.033333
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\景区测试视频03.mp4",
+      "file_name": "景区测试视频03.mp4",
+      "exists": true,
+      "file_size_bytes": 708585,
+      "file_size_mb": 0.68,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 6.03,
+        "frameRate": 30.0,
+        "width": 720,
+        "height": 1280,
+        "frames": 181,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 708585,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 6.033333
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\朱家角景区乌篷船摇橹合集mp4格式视频下载正版视频编号43283-摄图网.mp4",
+      "file_name": "朱家角景区乌篷船摇橹合集mp4格式视频下载正版视频编号43283-摄图网.mp4",
+      "exists": true,
+      "file_size_bytes": 138515490,
+      "file_size_mb": 132.1,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 145.28,
+        "frameRate": 29.97002997002997,
+        "width": 1920,
+        "height": 1080,
+        "frames": 4354,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 138515490,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 145.278467
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\游客测试视频01.mp4",
+      "file_name": "游客测试视频01.mp4",
+      "exists": true,
+      "file_size_bytes": 745615,
+      "file_size_mb": 0.71,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 8.03,
+        "frameRate": 30.0,
+        "width": 720,
+        "height": 1280,
+        "frames": 241,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 745615,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 8.033333
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\游客测试视频02.mp4",
+      "file_name": "游客测试视频02.mp4",
+      "exists": true,
+      "file_size_bytes": 2644235,
+      "file_size_mb": 2.52,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 25.67,
+        "frameRate": 30.0,
+        "width": 720,
+        "height": 1280,
+        "frames": 770,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 2644235,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 25.666667
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\游客测试视频03.mp4",
+      "file_name": "游客测试视频03.mp4",
+      "exists": true,
+      "file_size_bytes": 1560161,
+      "file_size_mb": 1.49,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 17.03,
+        "frameRate": 30.0,
+        "width": 720,
+        "height": 1280,
+        "frames": 511,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 1560161,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 17.033333
+    },
+    {
+      "file_path": "E:\\trae\\newvedio-project\\test-videos\\素材17.mp4",
+      "file_name": "素材17.mp4",
+      "exists": true,
+      "file_size_bytes": 10132575,
+      "file_size_mb": 9.66,
+      "file_extension": ".mp4",
+      "is_video": true,
+      "metadata": {
+        "duration": 8.61,
+        "frameRate": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "frames": 258,
+        "diagnostics": {
+          "opencv_success": true,
+          "ffprobe_success": true,
+          "opencv_method2_success": false,
+          "file_exists": true,
+          "file_size": 10132575,
+          "errors": []
+        }
+      },
+      "diagnosis_success": true,
+      "validation_status": "success",
+      "ffprobe_available": true,
+      "ffprobe_duration": 8.613991
+    }
+  ],
+  "success_rate": 100.0
+}

@@ -167,11 +167,24 @@ class AIService {
             error: parseError.message
           });
 
-          // 如果JSON解析失败，尝试返回原始内容作为基础结果
+          // 如果JSON解析失败，尝试从文本中提取duration信息
+          let extractedDuration = null;
+          try {
+            // 尝试从内容中提取duration信息
+            const durationMatch = content.match(/(?:duration|时长|持续时间)[：:\s]*(\d+(?:\.\d+)?)/i);
+            if (durationMatch) {
+              extractedDuration = parseFloat(durationMatch[1]);
+              console.log(`从文本中提取到duration: ${extractedDuration}秒`);
+            }
+          } catch (extractError) {
+            console.warn('从文本提取duration失败:', extractError.message);
+          }
+
+          // 返回包含提取duration的基础结果，避免硬编码为0
           return {
-            duration: 0,
+            duration: extractedDuration || null, // 使用null而不是0，表示无法确定
             resolution: "unknown",
-            frameRate: 0,
+            frameRate: null,
             keyframes: [],
             scenes: [],
             objects: [],
@@ -190,7 +203,8 @@ class AIService {
             },
             emotional_tone: "neutral",
             content_summary: typeof content === 'string' ? content.substring(0, 500) : '无法解析的内容',
-            parse_error: true
+            parse_error: true,
+            extraction_note: extractedDuration ? "从文本成功提取duration" : "无法从文本提取duration"
           };
         }
       } else {

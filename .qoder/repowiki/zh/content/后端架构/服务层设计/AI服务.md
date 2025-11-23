@@ -8,7 +8,17 @@
 - [aiService.test.js](file://backend/tests/services/aiService.test.js)
 - [qwen3-VL-视频理解API.md](file://qwen3-VL-视频理解API.md)
 - [qwen3-prompt.md](file://qwen3-prompt.md)
+- [video_analyzer.py](file://backend/scripts/video_analyzer.py) - *新增Python SDK支持*
+- [video_analyzer.py](file://backend/src/scripts/video_analyzer.py) - *新增Python脚本*
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增对Python SDK的调用支持，实现双模式视频分析架构
+- 添加对Python虚拟环境的兼容性处理
+- 增强对Python脚本返回数据的解析和处理逻辑
+- 更新三阶段处理流程以优先使用Python SDK
+- 新增文件路径转换和环境变量加载机制
 
 ## 目录
 1. [简介](#简介)
@@ -30,6 +40,7 @@ AI服务是一个基于阿里云通义千问模型的双模型协同架构系统
 - **三阶段处理流程**：原始分析 → 数据结构化 → 专业报告生成
 - **智能重试机制**：基于指数退避策略的故障恢复
 - **多种分析类型**：内容分析、视频融合分析、音乐提示生成
+- **双模式视频分析**：新增Python SDK支持，优先使用本地文件分析
 
 ## 项目结构
 
@@ -51,12 +62,14 @@ end
 subgraph "外部服务"
 H[阿里云通义千问API]
 I[视频文件存储]
+J[Python SDK]
 end
 A --> D
 D --> E
 E --> F
 F --> H
 F --> I
+F --> J
 ```
 
 **图表来源**
@@ -80,6 +93,7 @@ class AIService {
 +OpenAI textClient
 +constructor()
 +analyzeVideoContent(videoPath, prompt) Promise~Object~
++analyzeVideoWithSDK(videoPath, analysisType, extraPrompt, videoPath2) Promise~Object~
 +generateVideoReport(analysisData, reportType) Promise~String~
 +analyzeVideoThreeStage(videoPath) Promise~Object~
 +analyzeFusionThreeStage(video1Path, video2Path) Promise~Object~
@@ -92,6 +106,7 @@ class OpenAI {
 +create(config) Promise
 }
 AIService --> OpenAI : "使用两个客户端"
+AIService --> PythonSDK : "新增Python SDK支持"
 ```
 
 **图表来源**
@@ -123,17 +138,19 @@ B --> C[AIService]
 C --> D[视频分析]
 C --> E[文本生成]
 C --> F[数据结构化]
+C --> G[Python SDK集成]
 end
 subgraph "外部集成层"
-D --> G[通义千问VL API]
-E --> H[通义千问文本API]
-F --> I[数据处理]
+D --> H[通义千问VL API]
+E --> I[通义千问文本API]
+F --> J[数据处理]
+G --> K[Python虚拟环境]
 end
 subgraph "重试机制"
-J[callWithRetry] --> K[指数退避]
-J --> L[错误处理]
+L[callWithRetry] --> M[指数退避]
+L --> N[错误处理]
 end
-C --> J
+C --> L
 ```
 
 **图表来源**
@@ -181,6 +198,45 @@ Controller-->>Client : 返回响应
 **节来源**
 - [aiService.js](file://backend/src/services/aiService.js#L92-L118)
 
+### analyzeVideoWithSDK 方法
+
+analyzeVideoWithSDK 方法是新增的核心功能，用于通过Python SDK分析本地视频文件：
+
+```mermaid
+sequenceDiagram
+participant NodeJS as Node.js服务
+participant Python as Python SDK
+participant DashScope as 通义千问API
+NodeJS->>Python : 启动Python进程
+Note over Python : 加载环境变量
+Python->>Python : 验证API密钥
+Python->>Python : 检查文件存在性
+Python->>Python : 决定传输方式(Base64/file : //)
+Python->>DashScope : 发送分析请求
+DashScope-->>Python : 返回分析结果
+Python-->>NodeJS : 返回JSON结果
+NodeJS-->>NodeJS : 解析并处理结果
+```
+
+**图表来源**
+- [aiService.js](file://backend/src/services/aiService.js#L209-L318)
+- [video_analyzer.py](file://backend/scripts/video_analyzer.py#L1-L395)
+
+#### Python SDK调用流程
+
+| 步骤 | 操作 | 说明 |
+|------|------|------|
+| 1 | 路径转换 | 将HTTP URL转换为本地文件路径 |
+| 2 | 虚拟环境 | 使用项目根目录下的.venv环境 |
+| 3 | 进程启动 | 通过spawn启动Python进程 |
+| 4 | 参数传递 | 传递视频路径、分析类型等参数 |
+| 5 | 输出收集 | 收集stdout和stderr输出 |
+| 6 | 结果解析 | 解析JSON格式的返回结果 |
+| 7 | 错误处理 | 处理进程异常和解析错误 |
+
+**节来源**
+- [aiService.js](file://backend/src/services/aiService.js#L214-L318)
+
 ### generateVideoReport 方法
 
 generateVideoReport 方法根据不同的报告类型生成专业文本内容：
@@ -224,12 +280,18 @@ I --> J[返回专业报告]
 sequenceDiagram
 participant User as 用户
 participant Service as AIService
+participant SDK as Python SDK
 participant VL as VL模型
 participant Text as 文本模型
 User->>Service : analyzeVideoThreeStage()
 Note over Service : 第一阶段：原始分析
-Service->>VL : 调用analyzeVideoContent()
+par 优先使用Python SDK
+Service->>SDK : analyzeVideoWithSDK()
+SDK-->>Service : 返回分析结果
+else 回退到HTTP API
+Service->>VL : analyzeVideoContent()
 VL-->>Service : 返回原始分析结果
+end
 Note over Service : 第二阶段：数据结构化
 Service->>Service : structureVideoData()
 Service-->>Service : 返回结构化数据
@@ -248,17 +310,17 @@ Service-->>User : 返回完整结果
 sequenceDiagram
 participant User as 用户
 participant Service as AIService
-participant VL1 as VL模型1
-participant VL2 as VL模型2
+participant SDK1 as Python SDK1
+participant SDK2 as Python SDK2
 participant Text as 文本模型
 User->>Service : analyzeFusionThreeStage()
 Note over Service : 第一阶段：双视频分析
 par 并行分析
-Service->>VL1 : analyzeVideoContent(video1)
-Service->>VL2 : analyzeVideoContent(video2)
+Service->>SDK1 : analyzeVideoWithSDK(video1)
+Service->>SDK2 : analyzeVideoWithSDK(video2)
 end
-VL1-->>Service : 视频1分析结果
-VL2-->>Service : 视频2分析结果
+SDK1-->>Service : 视频1分析结果
+SDK2-->>Service : 视频2分析结果
 Note over Service : 第二阶段：数据整合
 Service->>Service : structureFusionData()
 Service-->>Service : 返回融合数据
@@ -361,29 +423,36 @@ A[OpenAI SDK]
 B[Express框架]
 C[Multer中间件]
 D[Node.js timers]
+E[Python SDK]
+F[DashScope API]
 end
 subgraph "内部模块"
-E[aiService.js]
-F[aiController.js]
-G[ai.js]
+G[aiService.js]
+H[aiController.js]
+I[ai.js]
+J[video_analyzer.py]
 end
 subgraph "配置文件"
-H[.env配置]
-I[package.json]
+K[.env配置]
+L[package.json]
+M[.venv虚拟环境]
 end
-A --> E
-B --> F
-C --> G
-D --> E
-H --> E
-I --> A
-E --> F
-F --> G
+A --> G
+B --> H
+C --> I
+E --> G
+F --> J
+K --> G
+K --> J
+M --> G
+G --> H
+H --> I
 ```
 
 **图表来源**
 - [aiService.js](file://backend/src/services/aiService.js#L1-L2)
 - [ai.js](file://backend/src/routes/ai.js#L1-L3)
+- [video_analyzer.py](file://backend/scripts/video_analyzer.py#L1-L395)
 
 ### 外部API集成
 
@@ -394,6 +463,7 @@ F --> G
 | `/compatible-mode/v1/chat/completions` | 视频内容分析 | qwen-vl-plus模型 |
 | `/compatible-mode/v1/chat/completions` | 文本生成 | qwen-plus模型 |
 | 基础URL | 区域配置 | 北京/新加坡 |
+| Python SDK | 本地文件分析 | file://协议支持 |
 
 **节来源**
 - [aiService.js](file://backend/src/services/aiService.js#L10-L18)
@@ -408,6 +478,7 @@ F --> G
 - **视频融合分析**：使用`Promise.all()`并行处理两个视频
 - **文件上传限制**：最多支持2个视频文件同时上传
 - **内存管理**：及时释放临时文件资源
+- **Python进程管理**：设置3分钟超时防止进程挂起
 
 ### 缓存策略
 
@@ -424,6 +495,7 @@ F --> G
 - **网络错误重试**：自动重试网络相关错误
 - **数据验证**：输入数据的完整性检查
 - **异常捕获**：全局异常处理和日志记录
+- **降级策略**：在AI服务不可用时生成本地概要
 
 ## 故障排除指南
 
@@ -435,6 +507,7 @@ F --> G
 | 认证错误 | 401未授权 | API密钥配置错误 | 验证DASHSCOPE_API_KEY配置 |
 | 文件不存在 | 视频文件找不到 | 文件路径错误 | 检查文件路径和权限 |
 | JSON解析失败 | 分析结果格式错误 | API返回非JSON数据 | 验证API响应格式 |
+| Python SDK错误 | 分析失败 | 虚拟环境或依赖问题 | 检查.venv环境和dashscope安装 |
 
 ### 调试技巧
 
@@ -442,6 +515,8 @@ F --> G
 2. **检查API响应**：验证通义千问API的响应格式
 3. **测试网络连接**：确保能够访问阿里云API端点
 4. **验证文件格式**：确认视频文件格式符合要求
+5. **检查Python环境**：确保.venv环境中安装了dashscope包
+6. **调试Python脚本**：使用--debug参数运行video_analyzer.py
 
 **节来源**
 - [aiService.js](file://backend/src/services/aiService.js#L121-L124)
@@ -457,6 +532,7 @@ AI服务通过创新的双模型协同架构和三阶段处理流程，成功实
 - **智能重试**：基于Qwen官方推荐的指数退避策略
 - **robust数据处理**：多层安全防护确保数据完整性
 - **灵活扩展**：清晰的架构设计支持功能扩展
+- **双模式分析**：新增Python SDK支持，提高本地文件处理效率
 
 ### 应用价值
 

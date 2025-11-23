@@ -477,9 +477,52 @@ export function useAIAnalysis() {
    * 格式化分析结果为用户友好的显示
    */
   const formattedResult = computed(() => {
-    if (!analysisResult.value) return null
+    if (!analysisResult.value) {
+      console.log('🔍 formattedResult: analysisResult为空')
+      return null
+    }
 
     const result = analysisResult.value
+
+    console.log('🔍 原始分析结果数据结构:', {
+      hasRawAnalysis: !!result.rawAnalysis,
+      hasStructuredData: !!result.structuredData,
+      rawAnalysisDuration: result.rawAnalysis?.duration,
+      structuredDataDuration: result.structuredData?.videoInfo?.duration,
+      finalReport: !!result.finalReport
+    })
+
+    // 构建完整的视频信息摘要
+    const buildVideoSummary = (rawAnalysis, structuredData) => {
+      const videoInfo = structuredData?.videoInfo || {}
+
+      // 从rawAnalysis提取统计信息
+      const rawStats = rawAnalysis ? {
+        duration: rawAnalysis.duration,
+        frameRate: rawAnalysis.frameRate,
+        resolution: rawAnalysis.resolution,
+        frames: rawAnalysis.frames,
+        keyframeCount: Array.isArray(rawAnalysis.keyframes) ? rawAnalysis.keyframes.length : (rawAnalysis.keyframeCount || 0),
+        sceneCount: Array.isArray(rawAnalysis.scenes) ? rawAnalysis.scenes.length : (rawAnalysis.sceneCount || 0),
+        objectCount: Array.isArray(rawAnalysis.objects) ? rawAnalysis.objects.length : (rawAnalysis.objectCount || 0),
+        actionCount: Array.isArray(rawAnalysis.actions) ? rawAnalysis.actions.length : (rawAnalysis.actionCount || 0)
+      } : {}
+
+      // 合并数据，优先使用structuredData，fallback到rawAnalysis
+      const summary = {
+        duration: videoInfo.duration || rawStats.duration || 0,
+        frameRate: videoInfo.frameRate || rawStats.frameRate,
+        resolution: videoInfo.resolution || rawStats.resolution,
+        frames: videoInfo.frames || rawStats.frames,
+        keyframeCount: videoInfo.keyframeCount || rawStats.keyframeCount || 0,
+        sceneCount: videoInfo.sceneCount || rawStats.sceneCount || 0,
+        objectCount: videoInfo.objectCount || rawStats.objectCount || 0,
+        actionCount: videoInfo.actionCount || rawStats.actionCount || 0
+      }
+
+      console.log('🔍 构建的视频摘要:', summary)
+      return summary
+    }
 
     return {
       analysisId: result.analysisId,
@@ -489,14 +532,14 @@ export function useAIAnalysis() {
       // 内容分析结果
       contentAnalysis: result.finalReport ? {
         report: result.finalReport,
-        summary: result.structuredData?.videoInfo || {}
+        summary: buildVideoSummary(result.rawAnalysis, result.structuredData)
       } : null,
 
       // 融合分析结果
       fusionAnalysis: result.fusionPlan ? {
         plan: result.fusionPlan,
-        video1Summary: result.video1Analysis?.structuredData?.videoInfo || {},
-        video2Summary: result.video2Analysis?.structuredData?.videoInfo || {},
+        video1Summary: buildVideoSummary(result.video1Analysis?.rawAnalysis, result.video1Analysis?.structuredData),
+        video2Summary: buildVideoSummary(result.video2Analysis?.rawAnalysis, result.video2Analysis?.structuredData),
         compatibility: result.fusionData?.analysis || {}
       } : null,
 

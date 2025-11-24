@@ -234,7 +234,14 @@ class AIService {
         if (videoPath.startsWith('http://localhost:8005/uploads/')) {
           // 从URL提取相对路径
           const urlPath = new URL(videoPath).pathname;
-          localVideoPath = path.join(__dirname, '..', 'upload', urlPath.replace(/^\/uploads\//, ''));
+          // 修复路径转换：从 src/services/ 回退到 backend/ 目录，然后进入 upload/
+          localVideoPath = path.join(__dirname, '..', '..', 'upload', urlPath.replace(/^\/uploads\//, ''));
+          console.log('🔧 路径转换:', {
+            originalUrl: videoPath,
+            urlPath: urlPath,
+            localPath: localVideoPath,
+            __dirname: __dirname
+          });
         }
 
         const venvPython = path.join(__dirname, '..', '..', '..', '.venv', 'Scripts', 'python.exe');
@@ -255,13 +262,20 @@ class AIService {
 
         console.log('执行Python命令:', args.join(' '));
 
+        console.log('🔧 环境变量检查:', {
+          nodeEnv: process.env.DASHSCOPE_API_KEY ? 'SET' : 'NOT_SET',
+          nodeEnvLength: process.env.DASHSCOPE_API_KEY?.length || 0,
+          pythonEnv: process.env.DASHSCOPE_API_KEY ? 'SET' : 'NOT_SET'
+        });
+
         // 启动Python进程
         const pythonProcess = spawn(pythonExe, args, {
           cwd: path.join(__dirname, '..'),
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            PYTHONIOENCODING: 'utf-8'
+            PYTHONIOENCODING: 'utf-8',
+            DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY
           }
         });
 
@@ -985,8 +999,29 @@ class AIService {
       return 0;
     };
 
-    // 安全获取时长 - 处理null情况
-    const duration = rawData && typeof rawData.duration === 'number' && rawData.duration >= 0 ? rawData.duration : 0;
+    // 修复: 安全获取时长 - 增强调试和更好的处理逻辑
+    console.log('🔍 structureVideoData - 处理duration:', {
+      rawDataDuration: rawData?.duration,
+      durationType: typeof rawData?.duration,
+      durationValue: rawData?.duration
+    });
+
+    let duration = 0;
+    if (rawData && typeof rawData.duration === 'number') {
+      if (rawData.duration >= 0) {
+        duration = rawData.duration;
+        console.log('✅ duration有效:', duration);
+      } else {
+        console.warn('⚠️ duration为负数，使用0:', rawData.duration);
+      }
+    } else if (rawData?.duration === null || rawData?.duration === undefined) {
+      console.warn('⚠️ duration为null/undefined，使用0');
+    } else {
+      console.warn('⚠️ duration类型异常:', {
+        value: rawData?.duration,
+        type: typeof rawData?.duration
+      });
+    }
 
     return {
       videoInfo: {

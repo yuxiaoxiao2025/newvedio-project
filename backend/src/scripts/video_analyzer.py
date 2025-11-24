@@ -5,6 +5,27 @@ import argparse
 import re
 import subprocess
 import logging
+import tempfile
+import urllib.request
+import urllib.parse
+
+def download_http_to_temp(http_url):
+    """下载HTTP URL到临时文件，返回本地路径"""
+    if not http_url.startswith(('http://', 'https://')):
+        return http_url  # 不是HTTP URL，直接返回
+
+    try:
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+            temp_path = temp_file.name
+
+        logging.info(f"正在下载视频文件: {http_url}")
+        urllib.request.urlretrieve(http_url, temp_path)
+        logging.info(f"视频文件下载完成: {temp_path}")
+        return temp_path
+    except Exception as e:
+        logging.error(f"下载视频文件失败: {e}")
+        return http_url  # 下载失败，返回原URL
 
 def to_file_url(p):
     p = os.path.abspath(p)
@@ -231,33 +252,47 @@ def main():
     parser.add_argument('--prompt', default='请以JSON格式输出：{"duration":秒数,"frameRate":帧率,"resolution":"WxH","frames":总帧数,"keyframeCount":数量,"sceneCount":数量,"objectCount":数量,"actionCount":数量,"keyframes":[],"scenes":[],"objects":[],"actions":[],"vlAnalysis":{},"finalReport":{},"structuredData":{}}')
     args = parser.parse_args()
 
-    local_path = args.video_path
-    logging.info(f"开始分析视频文件: {local_path}")
+    input_path = args.video_path
+    logging.info(f"开始分析视频文件: {input_path}")
 
-    meta = read_video_meta(local_path)
-    logging.info(f"视频元数据: duration={meta['duration']}, frameRate={meta['frameRate']}, resolution={meta['width']}x{meta['height']}")
+    # 如果是HTTP URL，下载到临时文件
+    local_path = download_http_to_temp(input_path)
+    is_temp_file = local_path != input_path
 
-    url = to_file_url(local_path)
-    ai, usage = call_dashscope(url, args.prompt, args.fps)
+    try:
+        meta = read_video_meta(local_path)
+        logging.info(f"视频元数据: duration={meta['duration']}, frameRate={meta['frameRate']}, resolution={meta['width']}x{meta['height']}")
 
-    if isinstance(ai, dict) and ai.get("error"):
-        logging.error(f"AI分析失败: {ai['error']}")
-    else:
-        logging.info("AI分析成功")
+        url = to_file_url(local_path)
+        ai, usage = call_dashscope(url, args.prompt, args.fps)
 
-    result = build_result(meta, ai)
-    logging.info(f"最终结果duration: {result['duration']}, 验证状态: {result.get('validation_status')}")
+        if isinstance(ai, dict) and ai.get("error"):
+            logging.error(f"AI分析失败: {ai['error']}")
+        else:
+            logging.info("AI分析成功")
 
-    o = {
-        "success": True,
-        "data": {
-            "rawAnalysis": result,
-            "finalReport": ai.get("finalReport") if isinstance(ai, dict) else None,
-            "structuredData": ai.get("structuredData") if isinstance(ai, dict) else None
-        },
-        "usage": usage
-    }
-    print(json.dumps(o, ensure_ascii=False))
+        result = build_result(meta, ai)
+        logging.info(f"最终结果duration: {result['duration']}, 验证状态: {result.get('validation_status')}")
+
+        o = {
+            "success": True,
+            "data": {
+                "rawAnalysis": result,
+                "finalReport": ai.get("finalReport") if isinstance(ai, dict) else None,
+                "structuredData": ai.get("structuredData") if isinstance(ai, dict) else None
+            },
+            "usage": usage
+        }
+        print(json.dumps(o, ensure_ascii=False))
+
+    finally:
+        # 清理临时文件
+        if is_temp_file and os.path.exists(local_path):
+            try:
+                os.unlink(local_path)
+                logging.info(f"已清理临时文件: {local_path}")
+            except Exception as e:
+                logging.warning(f"清理临时文件失败: {e}")
 
 if __name__ == '__main__':
     main()

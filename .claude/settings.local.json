@@ -15,7 +15,12 @@
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_file_upload",
       "mcp__playwright__browser_wait_for",
-      "mcp__playwright__browser_console_messages"
+      "mcp__playwright__browser_console_messages",
+      "Skill(superpowers:using-superpowers)",
+      "Skill(superpowers:systematic-debugging)",
+      "Skill(superpowers:verification-before-completion)",
+      "mcp__playwright__browser_press_key",
+      "Skill(superpowers:test-driven-development)"
     ],
     "deny": [],
     "ask": []
